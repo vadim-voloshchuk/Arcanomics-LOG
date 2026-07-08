@@ -1,6 +1,6 @@
 import random
 
-# === НАЧАЛЬНЫЕ ПАРАМЕТРЫ ===
+#  НАЧАЛЬНЫЕ ПАРАМЕТРЫ
 days = 20
 products = {
 
@@ -32,10 +32,10 @@ prices_inertia = []
 
 for day in range(1, days + 1):
     print("=" * 40)
-    # --- Температура ---
+    #  Температура 
     temp = random.randint(15, 45)
 
-    # --- Производство ---
+    #  Производство 
     product = random.randint(8, 15)
     event = "Нет"
 
@@ -55,16 +55,16 @@ for day in range(1, days + 1):
             product = 1
     for name, item in products.items():
 
-        # --- Покупки (спрос) ---
+        #  Покупки (спрос) 
         buy = random.randint(8, 15)
 
-        # --- Обновление склада ---
+        #  Обновление склада 
         item["stock"] += product
         item["stock"] -= buy
         if item["stock"] < 0:
             item["stock"] = 0
 
-        # --- Спрос и предложение ---
+        #  Спрос и предложение 
         demand = buy
         supply = product + item["stock"]
 
@@ -131,10 +131,10 @@ for day in range(1, days + 1):
 
         yesterday_p = price_inertia
 
-        # --- Средняя температура ---
+        #  Средняя температура 
         sum_t += temp
 
-        # --- Вывод ---
+        #  Вывод 
         print(f"\n{name}")
         print(f"Температура  : {temp}°C")
         print(f"Событие      : {event}")
@@ -145,7 +145,7 @@ for day in range(1, days + 1):
         print(f"Цена (линей) : {price_linear:.2f}")
         print(f"Цена (инерц) : {price_inertia:.2f}")
 
-# === ИТОГИ ===
+#  ИТОГИ
 avg_temp = sum_t / (days * len(products))
 avg_market = sum(prices_market) / len(prices_market)
 avg_linear = sum(prices_linear) / len(prices_linear)
@@ -178,4 +178,5 @@ print(f"  Разброс цен: от {min_inertia:.2f} до {max_inertia:.2f}")
 
 
 # ИСПРАВИТЬ ВЛИЯНИЕ ПОГОДНЫХ УСЛОВИЙ НА КАМЕНЬ И ДЕРЕВО
-# 
+# ЧТОТО СДЕЛАТЬ С ФОРМУЛАМИ
+#ЖЕЛАТЕЛЬНО СТАТИСТИКУ СДЕЛАТЬ
