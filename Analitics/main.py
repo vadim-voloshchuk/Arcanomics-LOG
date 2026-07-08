@@ -1,6 +1,6 @@
 import random
 
-# === НАЧАЛЬНЫЕ ПАРАМЕТРЫ ===
+# НАЧАЛЬНЫЕ ПАРАМЕТРЫ
 days = 20
 base_price = 40
 stock = 50  # Начальный запас
@@ -130,12 +130,12 @@ for day in range(1, days + 1):
     print(f"Цена (инерц) : {price_inertia:.2f}")
 
 # === ИТОГИ ===
-average_temp = sum_t / days
+avg_temp = sum_t / days
 avg_market = sum(prices_market) / len(prices_market)
 avg_linear = sum(prices_linear) / len(prices_linear)
 avg_inertia = sum(prices_inertia) / len(prices_inertia)
 
-#  разброс цен (макс - мин)
+# Считаем разброс цен (макс - мин)
 max_market = max(prices_market)
 min_market = min(prices_market)
 max_linear = max(prices_linear)
@@ -146,7 +146,7 @@ min_inertia = min(prices_inertia)
 print("\n" + "=" * 40)
 print("ИТОГИ СИМУЛЯЦИИ")
 print("=" * 40)
-print(f"Средняя температура: {average_temp:.2f}°C")
+print(f"Средняя температура: {avg_temp:.2f}°C")
 print()
 print("Рыночная формула:")
 print(f"  Средняя цена: {avg_market:.2f}")
