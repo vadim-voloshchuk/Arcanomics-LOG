@@ -1,4 +1,4 @@
-// Simulation clock and weather state transitions.
+// Simulation clock and real-world API weather mappings with stable ticking.
 function updateExactGameTime() {
     gameSecond++;
     if (gameSecond >= 60) { gameSecond = 0; gameMinute++; }
@@ -12,25 +12,58 @@ function updateExactGameTime() {
     if (gameHour === 0 && gameMinute === 0 && gameSecond === 0) {
         for (var cityId in citySimulations) {
             var data = citySimulations[cityId];
-            data.weatherDuration--;
-            if (data.weatherDuration <= 0) {
-                var rand = Math.random();
-                if (rand < 0.25) { data.weatherType = "drought"; data.weatherDuration = Math.floor(Math.random() * 4) + 3; }
-                else if (rand < 0.5) { data.weatherType = "rainy"; data.weatherDuration = Math.floor(Math.random() * 3) + 2; }
-                else { data.weatherType = "sunny"; data.weatherDuration = Math.floor(Math.random() * 5) + 3; }
+            if (data.cooldownDays > 0) {
+                data.cooldownDays--;
             }
         }
     }
+
     runSimulationStep();
 }
 
 function updateCityWeather(data) {
-    var dailyCycle = -Math.cos((gameHour - 4) * 2 * Math.PI / 24);
-    var targetTemp = data.baseTemp + (dailyCycle * 8);
-    data.currentEvent = "Нет";
-    if (data.weatherType === "drought") { targetTemp += 5; data.currentEvent = "Засуха"; data.humidity = Math.max(15, data.humidity - 0.1); }
-    else if (data.weatherType === "rainy") { targetTemp -= 4; data.currentEvent = "Дождь"; data.humidity = Math.min(95, data.humidity + 0.2); }
-    else { if (data.humidity > 50) data.humidity -= 0.1; if (data.humidity < 50) data.humidity += 0.1; }
-    if (targetTemp < 10) targetTemp = 10;
-    data.currentTemp = parseFloat(targetTemp.toFixed(1));
+    if (typeof data.cooldownDays === "undefined") data.cooldownDays = 0;
+
+    // Рассчитываем точный динамический индекс текущего часа симуляции
+    var totalHoursPassed = ((gameDay - 1) * 24) + gameHour;
+
+    var arrayLength = (data.weatherProfile && data.weatherProfile.hourly_temp) ? data.weatherProfile.hourly_temp.length : 24;
+    var weatherIndex = totalHoursPassed % arrayLength;
+
+    // Считываем изменяющиеся показатели часа из профиля API без блокировок
+    var realBaseTemp = (data.weatherProfile && data.weatherProfile.hourly_temp) ? (data.weatherProfile.hourly_temp[weatherIndex] ?? 22.0) : 22.0;
+    var realBaseHumidity = (data.weatherProfile && data.weatherProfile.hourly_humidity) ? (data.weatherProfile.hourly_humidity[weatherIndex] ?? 50.0) : 50.0;
+    var realPrecipitation = (data.weatherProfile && data.weatherProfile.hourly_precip) ? (data.weatherProfile.hourly_precip[weatherIndex] ?? 0.0) : 0.0;
+    var wmoCode = (data.weatherProfile && data.weatherProfile.hourly_wmo) ? (data.weatherProfile.hourly_wmo[weatherIndex] ?? 0) : 0;
+
+    var finalTemp = realBaseTemp;
+    var finalHumidity = realBaseHumidity;
+
+    var isRainingNow = (realPrecipitation > 0.1 || (wmoCode >= 51 && wmoCode <= 67) || (wmoCode >= 80 && wmoCode <= 82));
+    var isDroughtNow = (realBaseTemp > 34.0 && realBaseHumidity < 30);
+
+    if (data.cooldownDays > 0) {
+        data.currentEvent = "Затишье (Восстановление: " + data.cooldownDays + " д.)";
+    } else {
+        if (isRainingNow) {
+            data.currentEvent = "Дождь (" + realPrecipitation.toFixed(1) + " мм/ч)";
+            finalHumidity = Math.min(98, finalHumidity + 15);
+            data.lastEventWasActive = true;
+        } else if (isDroughtNow) {
+            data.currentEvent = "Засуха (Жара)";
+            finalTemp += 3.0;
+            data.lastEventWasActive = true;
+        } else {
+            if (data.lastEventWasActive) {
+                data.cooldownDays = Math.floor(Math.random() * 2) + 1;
+                data.lastEventWasActive = false;
+                data.currentEvent = "Затишье (Восстановление: " + data.cooldownDays + " д.)";
+            } else {
+                data.currentEvent = "Нет";
+            }
+        }
+    }
+
+    data.currentTemp = parseFloat(finalTemp.toFixed(1));
+    data.humidity = parseFloat(finalHumidity.toFixed(1));
 }
