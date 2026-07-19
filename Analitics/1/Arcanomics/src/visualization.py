@@ -1,69 +1,49 @@
-// Simulation clock and real-world API weather mappings with stable ticking.
-function updateExactGameTime() {
-    gameSecond++;
-    if (gameSecond >= 60) { gameSecond = 0; gameMinute++; }
-    if (gameMinute >= 60) { gameMinute = 0; gameHour++; }
-    if (gameHour >= 24) { gameHour = 0; gameDay++; }
+"""Render the graph into the self-contained interactive HTML page with full auto-responsive layout."""
 
-    if (gameMinute === 0 && gameSecond === 0) {
-        for (var id in citySimulations) citySimulations[id].population += Math.floor(Math.random() * 3) - 1;
-    }
+import json
+from pathlib import Path
+from typing import Any
+from pyvis.network import Network
 
-    if (gameHour === 0 && gameMinute === 0 && gameSecond === 0) {
-        for (var cityId in citySimulations) {
-            var data = citySimulations[cityId];
-            if (data.cooldownDays > 0) {
-                data.cooldownDays--;
-            }
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+SOURCE_DIR = PROJECT_ROOT / "src"
+OUTPUT_FILE = PROJECT_ROOT / "interactive_simulation_map.html"
+SCRIPT_FILES = ("init.js", "weather.js", "economy.js", "logistics.js", "simulation.js")
+
+def _load_simulation_scripts() -> str:
+    return "\n\n".join((SOURCE_DIR / name).read_text(encoding="utf-8") for name in SCRIPT_FILES)
+
+def generate_html(net: Network, roads_data_for_js: list[dict[str, Any]]) -> None:
+    """Write the graph HTML and append responsive canvas rules alongside simulation scripts."""
+    net.write_html(str(OUTPUT_FILE))
+
+    script = _load_simulation_scripts()
+    script = script.replace("__ROAD_DATA__", json.dumps(roads_data_for_js, ensure_ascii=False))
+
+    with (PROJECT_ROOT / "data" / "goods.json").open(encoding="utf-8") as source:
+        script = script.replace("__GOODS_DATA__", json.dumps(json.load(source), ensure_ascii=False))
+
+    html = OUTPUT_FILE.read_text(encoding="utf-8")
+
+    # Скрипт автоматической адаптации контейнера под Fullscreen и любые изменения окна
+    responsive_trigger = """
+    <script>
+    // Замораживаем физику после стабилизации, чтобы узлы не улетали при клике
+    network.on("stabilizationIterationsDone", function () {
+        network.setOptions({ physics: false });
+        network.fit(); // Автоматически подгоняет масштаб графа под текущий размер экрана
+    });
+    
+    // Перерасчет масштаба при изменении размеров окна / входе в полноэкранный режим
+    window.addEventListener('resize', function() {
+        if (typeof network !== 'undefined') {
+            network.fit();
         }
-    }
+    });
+    </script>
+    """
 
-    runSimulationStep();
-}
-
-function updateCityWeather(data) {
-    if (typeof data.cooldownDays === "undefined") data.cooldownDays = 0;
-
-    // Рассчитываем точный динамический индекс текущего часа симуляции
-    var totalHoursPassed = ((gameDay - 1) * 24) + gameHour;
-
-    var arrayLength = (data.weatherProfile && data.weatherProfile.hourly_temp) ? data.weatherProfile.hourly_temp.length : 24;
-    var weatherIndex = totalHoursPassed % arrayLength;
-
-    // Считываем изменяющиеся показатели часа из профиля API без блокировок
-    var realBaseTemp = (data.weatherProfile && data.weatherProfile.hourly_temp) ? (data.weatherProfile.hourly_temp[weatherIndex] ?? 22.0) : 22.0;
-    var realBaseHumidity = (data.weatherProfile && data.weatherProfile.hourly_humidity) ? (data.weatherProfile.hourly_humidity[weatherIndex] ?? 50.0) : 50.0;
-    var realPrecipitation = (data.weatherProfile && data.weatherProfile.hourly_precip) ? (data.weatherProfile.hourly_precip[weatherIndex] ?? 0.0) : 0.0;
-    var wmoCode = (data.weatherProfile && data.weatherProfile.hourly_wmo) ? (data.weatherProfile.hourly_wmo[weatherIndex] ?? 0) : 0;
-
-    var finalTemp = realBaseTemp;
-    var finalHumidity = realBaseHumidity;
-
-    var isRainingNow = (realPrecipitation > 0.1 || (wmoCode >= 51 && wmoCode <= 67) || (wmoCode >= 80 && wmoCode <= 82));
-    var isDroughtNow = (realBaseTemp > 34.0 && realBaseHumidity < 30);
-
-    if (data.cooldownDays > 0) {
-        data.currentEvent = "Затишье (Восстановление: " + data.cooldownDays + " д.)";
-    } else {
-        if (isRainingNow) {
-            data.currentEvent = "Дождь (" + realPrecipitation.toFixed(1) + " мм/ч)";
-            finalHumidity = Math.min(98, finalHumidity + 15);
-            data.lastEventWasActive = true;
-        } else if (isDroughtNow) {
-            data.currentEvent = "Засуха (Жара)";
-            finalTemp += 3.0;
-            data.lastEventWasActive = true;
-        } else {
-            if (data.lastEventWasActive) {
-                data.cooldownDays = Math.floor(Math.random() * 2) + 1;
-                data.lastEventWasActive = false;
-                data.currentEvent = "Затишье (Восстановление: " + data.cooldownDays + " д.)";
-            } else {
-                data.currentEvent = "Нет";
-            }
-        }
-    }
-
-    data.currentTemp = parseFloat(finalTemp.toFixed(1));
-    data.humidity = parseFloat(finalHumidity.toFixed(1));
-}
+    # Объединяем разметку, логику симуляции и адаптивный триггер интерфейса
+    combined_scripts = f"{responsive_trigger}\n<script>\n{script}\n</script>\n"
+    OUTPUT_FILE.write_text(html.replace("</body>", f"{combined_scripts}</body>"), encoding="utf-8")
+    print("📈 Адаптивная верстка под экраны успешно интегрирована.")
