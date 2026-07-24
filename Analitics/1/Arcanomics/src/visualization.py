@@ -47,3 +47,4 @@ def generate_html(net: Network, roads_data_for_js: list[dict[str, Any]]) -> None
     combined_scripts = f"{responsive_trigger}\n<script>\n{script}\n</script>\n"
     OUTPUT_FILE.write_text(html.replace("</body>", f"{combined_scripts}</body>"), encoding="utf-8")
     print("📈 Адаптивная верстка под экраны успешно интегрирована.")
+
