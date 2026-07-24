@@ -202,3 +202,4 @@ def create_graph() -> tuple[Network, list[dict[str, Any]]]:
       "interaction": { "hover": true, "tooltipDelay": 10 }
     }''')
     return net, roads_data_for_js
+
