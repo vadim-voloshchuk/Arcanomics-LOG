@@ -52,26 +52,41 @@ function updateCityEconomy(id, data, exactTimeString) {
         var currentProdPerHour = Math.round(baseProductVolume * 60);
         var supply = currentProdPerHour + Math.round(item.stock);
 
-        // Рыночный коэффициент баланса
-        var ratio = supply === 0 ? 1.3 : demand / supply;
-        ratio = Math.max(0.7, Math.min(ratio, 1.3));
-        var priceMarket = item.base_price * ratio;
+        var currentPrice;
+        if (ACTIVE_PRICE_MODEL === "market") {
+            var ratio = supply === 0 ? 1.3 : demand / supply;
+            ratio = Math.max(0.7, Math.min(ratio, 1.3));
+            currentPrice = item.base_price * ratio;
+        } else if (ACTIVE_PRICE_MODEL === "linear") {
+            currentPrice = item.base_price + (demand - currentProdPerHour) * 1.5 - item.stock * 0.2;
+            if (data.currentEvent.includes("Засуха")) currentPrice += 7;
+            if (data.currentEvent.includes("Дождь")) currentPrice -= 5;
+            currentPrice = Math.max(10, Math.min(currentPrice, 120));
+        } else if (ACTIVE_PRICE_MODEL === "inertia") {
+            currentPrice = item.last_price + (demand - currentProdPerHour) * 0.8 - item.stock * 0.1;
+            if (data.currentEvent.includes("Засуха")) currentPrice += 5;
+            if (data.currentEvent.includes("Дождь")) currentPrice -= 4;
+            currentPrice = Math.max(10, Math.min(currentPrice, 120));
+            item.last_price = currentPrice;
+        } else {
+            throw new Error("Unknown ACTIVE_PRICE_MODEL: " + ACTIVE_PRICE_MODEL);
+        }
+        item.current_price = currentPrice;
 
-        // Линейная цена с учетом влияния погодных катастроф из API
-        var priceLinear = item.base_price + (demand - currentProdPerHour) * 1.5 - item.stock * 0.2;
-        if (data.currentEvent.includes("Засуха")) priceLinear += 7;
-        if (data.currentEvent.includes("Дождь")) priceLinear -= 5;
-        priceLinear = Math.max(10, Math.min(priceLinear, 120));
-
-        // Инерционная (конечная рабочая) цена, на основе которой торгуют караваны
-        var priceInertia = item.last_price + (demand - currentProdPerHour) * 0.8 - item.stock * 0.1;
-        if (data.currentEvent.includes("Засуха")) priceInertia += 5;
-        if (data.currentEvent.includes("Дождь")) priceInertia -= 4;
-        priceInertia = Math.max(10, Math.min(priceInertia, 120));
-
-        // Сохраняем новые цены в глобальный объект симуляции
-        item.last_price = priceInertia;
-        item.current_price = priceInertia;
+        cityHourLogs.push({
+            model: ACTIVE_PRICE_MODEL,
+            seed: EXPERIMENT_SEED,
+            day: gameDay,
+            hour: gameHour,
+            city: id,
+            product: pName,
+            stock: item.stock,
+            production: currentProdPerHour,
+            demand: demand,
+            supply: supply,
+            current_price: currentPrice,
+            weather_event: data.currentEvent
+        });
 
         var specialNote = "";
         if (pName === "Камень") {
@@ -83,9 +98,7 @@ function updateCityEconomy(id, data, exactTimeString) {
             "\n * Производство : " + currentProdPerHour + " ед./ч (прогноз)" +
             "\n * Спрос (Закупки): " + demand + " ед./ч" +
             "\n * Предложение  : " + supply + " ед. (На складе: " + Math.round(item.stock) + ")" +
-            "\n * Цена (Рыночн) : " + priceMarket.toFixed(1) + " руб." +
-            "\n * Цена (Линейн) : " + priceLinear.toFixed(1) + " руб." +
-            "\n * Цена (Инерц)  : " + priceInertia.toFixed(1) + " руб.\n";
+            "\n * Цена (" + ACTIVE_PRICE_MODEL + ") : " + currentPrice.toFixed(1) + " руб.\n";
     }
 
     // Формируем красивый и точный интерактивный тултип для Vis.js
