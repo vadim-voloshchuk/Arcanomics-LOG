@@ -4,6 +4,19 @@ var gameMinute = 0;
 var gameHour = 6;
 var gameDay = 1;
 
+// Experiment configuration. Change only this value to compare price models.
+var ACTIVE_PRICE_MODEL = "market"; // "market", "linear" or "inertia"
+var EXPERIMENT_SEED = 123456789;
+var randomState = EXPERIMENT_SEED >>> 0;
+
+function seededRandom() {
+    randomState = (randomState * 1664525 + 1013904223) >>> 0;
+    return randomState / 4294967296;
+}
+
+var cityHourLogs = [];
+var roadHourLogs = [];
+
 var citySimulations = {};
 var roadNetwork = __ROAD_DATA__;
 var goodsTemplate = __GOODS_DATA__;
@@ -12,7 +25,7 @@ function initializeCitySimulations() {
     var nodeIds = nodes.getIds();
     nodeIds.forEach(function(id) {
         var nodeData = nodes.get(id);
-        var basePop = nodeData.population_base || Math.floor(Math.random() * (180000 - 40000) + 40000);
+        var basePop = nodeData.population_base || Math.floor(seededRandom() * (180000 - 40000) + 40000);
 
         var cityProducts = JSON.parse(JSON.stringify(goodsTemplate));
         var weatherProf = nodeData.weather_profile || { hourly_temp: [], hourly_humidity: [], hourly_precip: [], hourly_wmo: [] };
@@ -28,7 +41,7 @@ function initializeCitySimulations() {
         var avgHumidity = humidities.length > 0 ? humidities.reduce((a, b) => a + b, 0) / humidities.length : 50.0;
         var totalPrecip = precips.length > 0 ? precips.reduce((a, b) => a + b, 0) : 0.0;
 
-        const rnd = Math.random();
+        const rnd = seededRandom();
 var specialization;
 
 if (rnd < 0.35) {
