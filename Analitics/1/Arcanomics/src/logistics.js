@@ -75,8 +75,8 @@ function updateRoadLogistics() {
         );
 
         if (netProfit > 0) {
-            cityB.products[pName].stock -= 0.6;
-            cityA.products[pName].stock += 0.6;
+            cityB.products[pName].stock -= CARAVAN_VOLUME;
+            cityA.products[pName].stock += CARAVAN_VOLUME;
             isTradingNow = true;
             currentTripProfit = netProfit;
             road.totalProfit += netProfit;
@@ -99,8 +99,8 @@ function updateRoadLogistics() {
         );
 
         if (netProfit > 0) {
-            cityA.products[pName].stock -= 0.6;
-            cityB.products[pName].stock += 0.6;
+            cityA.products[pName].stock -= CARAVAN_VOLUME;
+            cityB.products[pName].stock += CARAVAN_VOLUME;
             isTradingNow = true;
             currentTripProfit = netProfit;
             road.totalProfit += netProfit;
@@ -112,6 +112,13 @@ function updateRoadLogistics() {
 }
 
         var avgProfit = road.totalTrips > 0 ? (road.totalProfit / road.totalTrips) : 0;
+
+        roadHourLogs.push({
+            road: road.u + " <-> " + road.v,
+            trip_count: road.totalTrips,
+            trip_profit: currentTripProfit,
+            total_profit: road.totalProfit
+        });
 
         var roadColor = "#2ecc71";
         var roadWidth = 2;
