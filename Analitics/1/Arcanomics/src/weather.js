@@ -6,7 +6,7 @@ function updateExactGameTime() {
     if (gameHour >= 24) { gameHour = 0; gameDay++; }
 
     if (gameMinute === 0 && gameSecond === 0) {
-        for (var id in citySimulations) citySimulations[id].population += Math.floor(Math.random() * 3) - 1;
+        for (var id in citySimulations) citySimulations[id].population += Math.floor(seededRandom() * 3) - 1;
     }
 
     if (gameHour === 0 && gameMinute === 0 && gameSecond === 0) {
@@ -18,7 +18,7 @@ function updateExactGameTime() {
         }
     }
 
-    runSimulationStep();
+    if (gameMinute === 0 && gameSecond === 0) runSimulationStep();
 }
 
 function updateCityWeather(data) {
@@ -55,7 +55,7 @@ function updateCityWeather(data) {
             data.lastEventWasActive = true;
         } else {
             if (data.lastEventWasActive) {
-                data.cooldownDays = Math.floor(Math.random() * 2) + 1;
+                data.cooldownDays = Math.floor(seededRandom() * 2) + 1;
                 data.lastEventWasActive = false;
                 data.currentEvent = "Затишье (Восстановление: " + data.cooldownDays + " д.)";
             } else {
