@@ -45,6 +45,34 @@ def generate_html(net: Network, roads_data_for_js: list[dict[str, Any]]) -> None
 
     # Объединяем разметку, логику симуляции и адаптивный триггер интерфейса
     combined_scripts = f"{responsive_trigger}\n<script>\n{script}\n</script>\n"
-    OUTPUT_FILE.write_text(html.replace("</body>", f"{combined_scripts}</body>"), encoding="utf-8")
+    simulation_controls = """
+    <style>
+    .simulation-controls {
+        position: fixed; top: 12px; left: 12px; z-index: 1000;
+        display: flex; align-items: end; gap: 10px; padding: 10px;
+        border: 1px solid #555; border-radius: 6px;
+        background: rgba(26, 26, 26, 0.92); color: #fff; font: 13px Arial, sans-serif;
+    }
+    .simulation-controls label { display: flex; flex-direction: column; gap: 4px; }
+    .simulation-controls select, .simulation-controls input, .simulation-controls button {
+        padding: 4px 6px; border: 1px solid #777; border-radius: 3px;
+    }
+    .simulation-controls button { cursor: pointer; background: #2ecc71; color: #111; font-weight: bold; }
+    .simulation-controls button:disabled { cursor: default; opacity: 0.65; }
+    </style>
+    <div class="simulation-controls" aria-label="Simulation settings">
+        <label>Price model:
+            <select id="priceModelSelect">
+                <option value="market">Market</option>
+                <option value="linear">Linear</option>
+                <option value="inertia">Inertia</option>
+            </select>
+        </label>
+        <label>Simulation duration (days):
+            <input id="simulationDurationInput" type="number" min="1" max="365" step="1" value="30">
+        </label>
+        <button id="startSimulationButton" type="button">Start simulation</button>
+    </div>
+    """
+    OUTPUT_FILE.write_text(html.replace("</body>", f"{simulation_controls}{combined_scripts}</body>"), encoding="utf-8")
     print("📈 Адаптивная верстка под экраны успешно интегрирована.")
-
