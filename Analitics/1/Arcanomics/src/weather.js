@@ -1,69 +1,145 @@
-// Simulation clock and real-world API weather mappings with stable ticking.
-function updateExactGameTime() {
-    gameSecond++;
-    if (gameSecond >= 60) { gameSecond = 0; gameMinute++; }
-    if (gameMinute >= 60) { gameMinute = 0; gameHour++; }
-    if (gameHour >= 24) { gameHour = 0; gameDay++; }
+// Autonomous global weather-event system. All random choices use seededRandom().
+var EventSystem = {
+    currentEvent: null,
+    daysRemaining: 0,
+    cooldownDays: 0,
+    lastEvent: null,
+    lastProcessedDay: 0,
+    selectionWeights: null,
+    eventHistory: [],
 
-    if (gameMinute === 0 && gameSecond === 0) {
-        for (var id in citySimulations) citySimulations[id].population += Math.floor(seededRandom() * 3) - 1;
-    }
+    definitions: [
+        { key: "drought", name: "Засуха", logName: "Drought", minDays: 3, maxDays: 4, resource: "Хлеб", productionMultiplier: 0.65, priceMultiplier: 1.20 },
+        { key: "downpour", name: "Ливень", logName: "Downpour", minDays: 2, maxDays: 3, transportMultiplier: 0.80, transportCostMultiplier: 1.10 },
+        { key: "frost", name: "Заморозки", logName: "Frost", minDays: 2, maxDays: 3, resource: "Хлеб", productionMultiplier: 0.70 },
+        { key: "storm", name: "Шторм", logName: "Storm", minDays: 1, maxDays: 2, transportMultiplier: 0.60 },
+        { key: "fog", name: "Туман", logName: "Fog", minDays: 1, maxDays: 2, transportMultiplier: 0.85 },
+        { key: "harvest", name: "Урожайный сезон", logName: "Harvest Season", minDays: 3, maxDays: 4, resource: "Хлеб", productionMultiplier: 1.25 },
+        { key: "fire", name: "Пожар на производстве", logName: "Production Fire", minDays: 1, maxDays: 2, productionMultiplier: 0.50 }
+    ],
 
-    if (gameHour === 0 && gameMinute === 0 && gameSecond === 0) {
-        for (var cityId in citySimulations) {
-            var data = citySimulations[cityId];
-            if (data.cooldownDays > 0) {
-                data.cooldownDays--;
-            }
+    reset: function() {
+        this.currentEvent = null;
+        this.daysRemaining = 0;
+        this.cooldownDays = 0;
+        this.lastEvent = null;
+        this.lastProcessedDay = 0;
+        this.selectionWeights = null;
+        this.eventHistory = [];
+    },
+
+    advanceToDay: function(day) {
+        if (this.lastProcessedDay === day) return;
+        this.lastProcessedDay = day;
+
+        if (this.currentEvent) {
+            this.daysRemaining--;
+            if (this.daysRemaining <= 0) this.endEvent(day - 1);
+            return;
         }
-    }
 
-    if (gameMinute === 0 && gameSecond === 0) runSimulationStep();
-}
-
-function updateCityWeather(data) {
-    if (typeof data.cooldownDays === "undefined") data.cooldownDays = 0;
-
-    // Рассчитываем точный динамический индекс текущего часа симуляции
-    var totalHoursPassed = ((gameDay - 1) * 24) + gameHour;
-
-    var arrayLength = (data.weatherProfile && data.weatherProfile.hourly_temp) ? data.weatherProfile.hourly_temp.length : 24;
-    var weatherIndex = totalHoursPassed % arrayLength;
-
-    // Считываем изменяющиеся показатели часа из профиля API без блокировок
-    var realBaseTemp = (data.weatherProfile && data.weatherProfile.hourly_temp) ? (data.weatherProfile.hourly_temp[weatherIndex] ?? 22.0) : 22.0;
-    var realBaseHumidity = (data.weatherProfile && data.weatherProfile.hourly_humidity) ? (data.weatherProfile.hourly_humidity[weatherIndex] ?? 50.0) : 50.0;
-    var realPrecipitation = (data.weatherProfile && data.weatherProfile.hourly_precip) ? (data.weatherProfile.hourly_precip[weatherIndex] ?? 0.0) : 0.0;
-    var wmoCode = (data.weatherProfile && data.weatherProfile.hourly_wmo) ? (data.weatherProfile.hourly_wmo[weatherIndex] ?? 0) : 0;
-
-    var finalTemp = realBaseTemp;
-    var finalHumidity = realBaseHumidity;
-
-    var isRainingNow = (realPrecipitation > 0.1 || (wmoCode >= 51 && wmoCode <= 67) || (wmoCode >= 80 && wmoCode <= 82));
-    var isDroughtNow = (realBaseTemp > 34.0 && realBaseHumidity < 30);
-
-    if (data.cooldownDays > 0) {
-        data.currentEvent = "Затишье (Восстановление: " + data.cooldownDays + " д.)";
-    } else {
-        if (isRainingNow) {
-            data.currentEvent = "Дождь (" + realPrecipitation.toFixed(1) + " мм/ч)";
-            finalHumidity = Math.min(98, finalHumidity + 15);
-            data.lastEventWasActive = true;
-        } else if (isDroughtNow) {
-            data.currentEvent = "Засуха (Жара)";
-            finalTemp += 3.0;
-            data.lastEventWasActive = true;
-        } else {
-            if (data.lastEventWasActive) {
-                data.cooldownDays = Math.floor(seededRandom() * 2) + 1;
-                data.lastEventWasActive = false;
-                data.currentEvent = "Затишье (Восстановление: " + data.cooldownDays + " д.)";
-            } else {
-                data.currentEvent = "Нет";
-            }
+        if (this.cooldownDays > 0) {
+            this.cooldownDays--;
+            console.log("Cooldown remaining: " + this.cooldownDays + " days");
+            if (this.cooldownDays > 0) return;
         }
-    }
 
-    data.currentTemp = parseFloat(finalTemp.toFixed(1));
-    data.humidity = parseFloat(finalHumidity.toFixed(1));
-}
+        if (seededRandom() < 0.35) this.startEvent(day);
+    },
+
+    startEvent: function(day) {
+        var event = this.chooseEvent();
+        var duration = event.minDays + Math.floor(seededRandom() * (event.maxDays - event.minDays + 1));
+        var affectedResource = event.resource || null;
+        if (event.key === "fire") {
+            var resources = ["Хлеб", "Дерево", "Камень"];
+            affectedResource = resources[Math.floor(seededRandom() * resources.length)];
+        }
+
+        this.currentEvent = {
+            key: event.key,
+            name: event.name,
+            logName: event.logName,
+            productionMultiplier: event.productionMultiplier || 1,
+            transportMultiplier: event.transportMultiplier || 1,
+            transportCostMultiplier: event.transportCostMultiplier || 1,
+            priceMultiplier: event.priceMultiplier || 1,
+            affectedResource: affectedResource,
+            duration: duration,
+            startDay: day
+        };
+        this.daysRemaining = duration;
+        this.selectionWeights = null;
+        this.eventHistory.push({
+            start_day: day,
+            end_day: day + duration - 1,
+            duration: duration,
+            event: event.name,
+            affected_resource: affectedResource || "-",
+            production_multiplier: this.currentEvent.productionMultiplier,
+            transport_multiplier: this.currentEvent.transportMultiplier,
+            transport_cost_multiplier: this.currentEvent.transportCostMultiplier,
+            price_multiplier: this.currentEvent.priceMultiplier
+        });
+        console.log("⚡ Event started: " + event.logName);
+        console.log("Duration: " + duration + " days");
+    },
+
+    endEvent: function(endDay) {
+        var endedEvent = this.currentEvent;
+        this.lastEvent = endedEvent.key;
+        this.selectionWeights = this.getClimateMemory(endedEvent.key);
+        this.currentEvent = null;
+        this.cooldownDays = 4 + Math.floor(seededRandom() * 4);
+        console.log("✅ Event ended: " + endedEvent.logName);
+        console.log("Cooldown: " + this.cooldownDays + " days");
+    },
+
+    chooseEvent: function() {
+        var candidates = this.definitions.filter(function(event) {
+            return event.key !== EventSystem.lastEvent;
+        });
+        var weights = this.selectionWeights || {};
+        var totalWeight = candidates.reduce(function(total, event) {
+            return total + (weights[event.key] || 1);
+        }, 0);
+        var target = seededRandom() * totalWeight;
+        for (var i = 0; i < candidates.length; i++) {
+            target -= weights[candidates[i].key] || 1;
+            if (target <= 0) return candidates[i];
+        }
+        return candidates[candidates.length - 1];
+    },
+
+    getClimateMemory: function(eventKey) {
+        var weights = {};
+        if (eventKey === "drought") { weights.downpour = 1.25; weights.harvest = 1.10; }
+        if (eventKey === "downpour") { weights.fog = 1.20; weights.harvest = 1.15; weights.drought = 0.40; }
+        if (eventKey === "storm") weights.downpour = 1.20;
+        if (eventKey === "frost") { weights.harvest = 1.20; weights.drought = 0.40; }
+        if (eventKey === "harvest") weights.drought = 1.10;
+        return weights;
+    },
+
+    getModifiers: function(productName) {
+        var modifiers = { productionMultiplier: 1, transportMultiplier: 1, transportCostMultiplier: 1, priceMultiplier: 1 };
+        if (!this.currentEvent) return modifiers;
+        var event = this.currentEvent;
+        if (!event.affectedResource || typeof productName === "undefined" || productName === event.affectedResource) {
+            modifiers.productionMultiplier = event.productionMultiplier;
+            modifiers.priceMultiplier = event.priceMultiplier;
+        }
+        modifiers.transportMultiplier = event.transportMultiplier;
+        modifiers.transportCostMultiplier = event.transportCostMultiplier;
+        return modifiers;
+    },
+
+    getEventName: function() {
+        return this.currentEvent ? this.currentEvent.name : "Нет";
+    },
+
+    getDisplayText: function() {
+        if (!this.currentEvent) return "Нет активных погодных событий";
+        return this.currentEvent.name + " (осталось: " + this.daysRemaining + " д.)";
+    }
+};
