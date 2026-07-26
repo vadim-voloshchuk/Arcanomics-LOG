@@ -1,13 +1,11 @@
-"""Build the dynamic, fully connected city and road map with isolated regions and verified single API weather calls."""
+"""Build the dynamic, fully connected city and road map with isolated regions."""
 
 import json
 import math
 from pathlib import Path
-import time
 from typing import Any
 import networkx as nx
 from pyvis.network import Network
-import requests
 
 current_dir = Path(__file__).resolve().parent
 PROJECT_ROOT = current_dir
@@ -45,46 +43,6 @@ def get_region_cities(region_name: str, max_cities: int = 5) -> list[dict]:
             "name": f"{region_name} - {names_pool[i]}", "lat": base_lat + offset_lat, "lon": base_lon + offset_lon, "population": pop
         })
     return procedural_cities
-
-def get_real_weather_profile(lat: float, lon: float) -> dict:
-    """Скачивает реальные суточные циклы погоды через стабильный шлюз, отключая проверку SSL."""
-    # Используем стабильный корневой шлюз Open-Meteo
-    base_url = "https://open-meteo.com"
-
-    query_params = {
-        "latitude": float(lat),
-        "longitude": float(lon),
-        "hourly": "temperature_2m,relative_humidity_2m,precipitation,weather_code",
-        "past_days": 2,
-        "forecast_days": 2
-    }
-
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-    }
-
-    try:
-        requests.packages.urllib3.disable_warnings()
-        response = requests.get(base_url, params=query_params, headers=headers, verify=False, timeout=8)
-
-        if response.status_code == 200:
-            res = response.json()
-            return {
-                "hourly_temp": res["hourly"]["temperature_2m"],
-                "hourly_humidity": res["hourly"]["relative_humidity_2m"],
-                "hourly_precip": res["hourly"]["precipitation"],
-                "hourly_wmo": res["hourly"]["weather_code"]
-            }
-    except:
-        pass
-
-    # Идеальный резервный цикл, если метео-сервер упал или заблокировал IP
-    return {
-        "hourly_temp": [22.0 + math.sin(h * math.pi / 12) * 6 for h in range(96)],
-        "hourly_humidity": [55 for _ in range(96)],
-        "hourly_precip": [0.0 for _ in range(96)],
-        "hourly_wmo": [0 for _ in range(96)]
-    }
 
 def calculate_distance(lat1, lon1, lat2, lon2):
     """Вычисление расстояния между точками по формуле гаверсинусов (в км)."""
@@ -125,22 +83,14 @@ def create_graph() -> tuple[Network, list[dict[str, Any]]]:
         print("❌ Не удалось загрузить ни одного города.")
         return net, []
 
-    # Шаг 2: Поочередно скачиваем погоду для каждого города с микропаузой
-    for idx, c in enumerate(all_compiled_cities):
-        print(f"🌤️ Скачиваю погоду API для {idx+1}/{len(all_compiled_cities)}: {c['name']}...")
-
-        # Задержка в 0.3 секунды, чтобы защитить скрипт от блокировок по Rate Limit
-        time.sleep(0.6)
-
-        weather_prof = get_real_weather_profile(c["lat"], c["lon"])
-
+    # Шаг 2: Добавляем города без внешних погодных данных.
+    for c in all_compiled_cities:
         graph.add_node(c["name"], population=c["population"], lat=c["lat"], lon=c["lon"], region=c["region_part"])
 
         net.add_node(
             c["name"], label=c["name"], title="",
             size=38 if c["is_capital"] else (26 if c["population"] > 500000 else 20),
             color="#f1c40f" if c["is_capital"] else ("#3498db" if c["population"] > 500000 else "#2ecc71"),
-            weather_profile=weather_prof,
             population_base=c["population"]
         )
 
@@ -202,4 +152,3 @@ def create_graph() -> tuple[Network, list[dict[str, Any]]]:
       "interaction": { "hover": true, "tooltipDelay": 10 }
     }''')
     return net, roads_data_for_js
-
