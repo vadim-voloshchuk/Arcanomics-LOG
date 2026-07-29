@@ -8,14 +8,20 @@ function updateRoadLogistics() {
             road.totalTrips = 0;
         }
 
-        var weatherModifiers = EventSystem.getModifiers();
-        var speedModifier = weatherModifiers.transportMultiplier;
-        var weatherNotice = EventSystem.getDisplayText();
+        // Берем погодные модификаторы обоих городов
+        var modA = EventSystem.getModifiers(cityA.localEventObject);
+        var modB = EventSystem.getModifiers(cityB.localEventObject);
+
+        // Считаем среднее влияние на транспорт
+        var speedModifier = (modA.transportMultiplier + modB.transportMultiplier) / 2;
+        var costModifier = (modA.transportCostMultiplier + modB.transportCostMultiplier) / 2;
+
+        var weatherNotice = cityA.currentEvent + " | " + cityB.currentEvent;
         var tempRoutesList = road.routes.slice(0, 1);
         var mainRoute = tempRoutesList.shift();
         var distance = mainRoute.dist;
         var baseTransportCost = distance * 0.5;
-        var finalTransportCost = baseTransportCost * weatherModifiers.transportCostMultiplier;
+        var finalTransportCost = baseTransportCost * costModifier;
         var activeTradeCargo = "Нет активных караванов";
         var isTradingNow = false;
         var currentTripProfit = 0;
