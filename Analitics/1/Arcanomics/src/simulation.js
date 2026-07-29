@@ -6,6 +6,14 @@ var simulationStarted = false;
 var simulationLogRows = [];
 var priceHistoryRows = [];
 
+var chartsHistory = {
+    hours: [],
+    breadPrices: [], woodPrices: [], stonePrices: [],
+    emptyStockShares: [],
+    avgRouteProfits: []
+};
+var totalSimulationHoursCounter = 0;
+
 window.onload = function () {
     initializeCitySimulations();
 
@@ -73,6 +81,8 @@ function runSimulationHour() {
     EventSystem.advanceToDay(gameDay);
     runSimulationStep();
     if (gameHour === 23) recordDailySimulationData();
+    updateRegionalDashboard();
+    recordAndDrawCharts();
     completedGameHours++;
     if (completedGameHours >= SIMULATION_DURATION_HOURS) {
         clearInterval(simulationTimer);
@@ -85,13 +95,31 @@ function runSimulationStep() {
     var mStr = gameMinute < 10 ? "0" + gameMinute : gameMinute;
     var sStr = gameSecond < 10 ? "0" + gameSecond : gameSecond;
     var exactTimeString = hStr + ":" + mStr + ":" + sStr;
+
+    // Цикл по всем городам симуляции
     for (var id in citySimulations) {
         var data = citySimulations[id];
-        data.currentEvent = EventSystem.getDisplayText();
+        
+        // Извлекаем текущую запись базовой погоды из глобального пула
+        var currentGlobalHour = (((gameDay - 1) * 24) + gameHour) % weatherHistoryDB.length;
+        var baseRecord = weatherHistoryDB[currentGlobalHour];
+
+        // Генерируем УНИКАЛЬНУЮ локальную погоду конкретно для этого города!
+        var localWeather = EventSystem.getCityLocalWeather(id, baseRecord, gameDay, gameHour);
+        
+        // Записываем локальный объект погоды прямо внутрь данных города
+        data.localWeatherObject = localWeather; 
+        data.currentEvent = localWeather.name; // Этот текст пойдет в тултип города
+
+        // Запускаем экономику города с его персональной погодой
         updateCityEconomy(id, data, exactTimeString);
     }
+    
+    // Обновляем логистику дорог
     updateRoadLogistics();
 }
+
+
 
 function recordDailySimulationData() {
     var modifiers = EventSystem.getModifiers();
@@ -162,4 +190,359 @@ function downloadSimulationResults() {
         EventSystem.eventHistory,
         ["start_day", "end_day", "duration", "event", "affected_resource", "production_multiplier", "transport_multiplier", "transport_cost_multiplier", "price_multiplier"]
     );
+
+    downloadCsv(
+        "routes_history.csv",
+        roadHourLogs,
+        ["road", "trip_count", "trip_profit", "total_profit"]
+    );
+}
+
+// Глобальная переменная для хранения активной вкладки (по умолчанию "regions")
+var currentDashboardTab = "regions";
+
+function updateRegionalDashboard() {
+    if (typeof isDashboardVisibleGlobal === "undefined") {
+        window.isDashboardVisibleGlobal = true;
+    }
+
+    // 1. Создаем контейнер панели, если его еще нет
+    var dashboard = document.getElementById("regional-dashboard");
+    if (!dashboard) {
+        dashboard = document.createElement("div");
+        dashboard.id = "regional-dashboard";
+        dashboard.style.cssText = "position:fixed; top:85px; left:12px; bottom:12px; z-index:1000; " +
+                                  "width:340px; background:rgba(26,26,26,0.95); border:1px solid #555; " +
+                                  "border-radius:6px; color:#fff; font-family:Arial, sans-serif; font-size:12px; " +
+                                  "overflow-y:auto; padding:12px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); " +
+                                  "display: flex; flex-direction: column; gap: 10px; transition: left 0.2s ease;";
+        document.body.appendChild(dashboard);
+
+        // СОЗДАЕМ НЕЗАВИСИМУЮ КНОПКУ СНАРУЖИ ПАНЕЛИ И ПРИВЯЗЫВАЕМ ЕЁ К BODY
+        var toggleSideBtn = document.createElement("div");
+        toggleSideBtn.id = "dashboard-sidebar-toggle";
+        toggleSideBtn.style.cssText = "position:fixed; top:50%; left:352px; transform:translateY(-50%); " +
+                                      "width:20px; height:60px; background:#333; border:1px solid #555; " +
+                                      "border-left:none; border-radius:0 6px 6px 0; cursor:pointer; " +
+                                      "display:flex; align-items:center; justify-content:center; color:#f1c40f; " +
+                                      "font-weight:bold; font-size:11px; z-index:1002; user-select:none; transition: left 0.2s ease;";
+        toggleSideBtn.innerText = "◀";
+        
+        toggleSideBtn.onclick = function() {
+            var p = document.getElementById("regional-dashboard");
+            var b = document.getElementById("dashboard-sidebar-toggle");
+            
+            if (p && b) {
+                // Читаем глобальный флаг симуляции
+                window.isDashboardVisibleGlobal = !window.isDashboardVisibleGlobal;
+                
+                if (window.isDashboardVisibleGlobal) {
+                    p.style.left = "12px";
+                    b.style.left = "352px"; // Сдвигаем кнопку вслед за панелью
+                    b.innerText = "◀";
+                } else {
+                    p.style.left = "-342px"; // Прячем панель за экран
+                    b.style.left = "0px";    // Прижимаем кнопку к самому левому краю экрана
+                    b.innerText = "▶";
+                }
+            }
+        };
+        
+        document.body.appendChild(toggleSideBtn); // Вешаем на body, чтобы innerHTML её не стирал!
+    }
+    
+    var savedScrollTop = dashboard.scrollTop;
+
+
+    // 2. Формируем шапку панели и кнопки переключения вкладок
+    var htmlContent = "";
+    var innerScrollContainer = document.getElementById("dashboard-inner-scroll");
+    var savedScrollTop = innerScrollContainer ? innerScrollContainer.scrollTop : 0;
+
+    htmlContent += "<h3 style='margin:0; padding-bottom:5px; color:#f1c40f; font-size:14px;'>📊 МОНИТОРИНГ СИСТЕМЫ</h3>";
+    htmlContent += "<div style='color:#aaa; font-size:11px;'>⏱️ Время: День " + gameDay + " | " + (gameHour < 10 ? "0" + gameHour : gameHour) + ":00</div>";
+    
+    // Стили для кнопок-вкладок
+    var btnStyleReg = "flex:1; padding:6px; border:1px solid #777; border-radius:4px; font-weight:bold; cursor:pointer; text-align:center;";
+    var btnStyleCit = "flex:1; padding:6px; border:1px solid #777; border-radius:4px; font-weight:bold; cursor:pointer; text-align:center;";
+    
+    if (currentDashboardTab === "regions") {
+        btnStyleReg += " background:#3498db; color:#fff;";
+        btnStyleCit += " background:#222; color:#aaa;";
+    } else {
+        btnStyleReg += " background:#222; color:#aaa;";
+        btnStyleCit += " background:#3498db; color:#fff;";
+    }
+
+    // Внедряем кнопки переключения с обработчиками клика
+    htmlContent += "<div style='display:flex; gap:8px; margin-top:5px; margin-bottom:5px;'>" +
+                   "<div style='" + btnStyleReg + "' onclick='currentDashboardTab=\"regions\"; updateRegionalDashboard();'>🌍 Регионы</div>" +
+                   "<div style='" + btnStyleCit + "' onclick='currentDashboardTab=\"cities\"; updateRegionalDashboard();'>🏙️ Города</div>" +
+                   "</div>";
+
+    htmlContent += "<div id='dashboard-inner-scroll' style='flex:1; overflow-y:auto; padding-right:2px;'>";
+
+    // 3. ОТРИСОВКА ВКЛАДКИ «РЕГИОНЫ»
+    if (currentDashboardTab === "regions") {
+        var regions = {};
+        
+        for (var cityId in citySimulations) {
+            var city = citySimulations[cityId];
+            var rawNode = typeof nodes !== "undefined" ? nodes.get(cityId) : null;
+            var regionName = (rawNode && rawNode.region) ? rawNode.region : "Глобальный";
+            regionName = regionName.charAt(0).toUpperCase() + regionName.slice(1);
+
+            if (!regions[regionName]) {
+                regions[regionName] = {
+                    citiesCount: 0,
+                    weather: city.currentEvent || "Ясно",
+                    breadPrices: [], woodPrices: [], stonePrices: [],
+                    tripsCount: 0
+                };
+            }
+            
+            regions[regionName].citiesCount++;
+            if (city.products["Хлеб"]) regions[regionName].breadPrices.push(city.products["Хлеб"].current_price);
+            if (city.products["Дерево"]) regions[regionName].woodPrices.push(city.products["Дерево"].current_price);
+            if (city.products["Камень"]) regions[regionName].stonePrices.push(city.products["Камень"].current_price);
+        }
+
+        if (typeof roadNetwork !== "undefined" && Array.isArray(roadNetwork)) {
+            roadNetwork.forEach(function(road) {
+                var trips = road.totalTrips || 0;
+                var nodeA = typeof nodes !== "undefined" ? nodes.get(road.u) : null;
+                var rName = (nodeA && nodeA.region) ? nodeA.region : "Глобальный";
+                rName = rName.charAt(0).toUpperCase() + rName.slice(1);
+                if (regions[rName]) {
+                    regions[rName].tripsCount += trips;
+                }
+            });
+        }
+
+        for (var rKey in regions) {
+            var rData = regions[rKey];
+            var avgBread = rData.breadPrices.length ? (rData.breadPrices.reduce(function(a,b){return a+b;}, 0) / rData.breadPrices.length) : 0;
+            var avgWood = rData.woodPrices.length ? (rData.woodPrices.reduce(function(a,b){return a+b;}, 0) / rData.woodPrices.length) : 0;
+            var avgStone = rData.stonePrices.length ? (rData.stonePrices.reduce(function(a,b){return a+b;}, 0) / rData.stonePrices.length) : 0;
+
+            htmlContent += "<div style='margin-bottom:10px; background:rgba(50,50,50,0.4); padding:8px; border-radius:4px; border-left:3px solid #3498db;'>" +
+                           "<div style='font-weight:bold; color:#3498db; font-size:13px; margin-bottom:4px;'>" + rKey + " (" + rData.citiesCount + " г.)</div>" +
+                           "<div style='margin-bottom:2px;'>🌤️ Погода: <span style='color:#e74c3c;'>" + rData.weather + "</span></div>" +
+                           "<div style='margin-bottom:4px;'>🚚 Всего рейсов: <span style='color:#2ecc71; font-weight:bold;'>"+ rData.tripsCount +"</span></div>" +
+                           "<div style='font-size:11px; color:#ddd; line-height:1.4;'>" +
+                           "• Ср. цена Хлеба: " + avgBread.toFixed(1) + " руб.<br>" +
+                           "• Ср. цена Дерева: " + avgWood.toFixed(1) + " руб.<br>" +
+                           "• Ср. цена Камня: " + avgStone.toFixed(1) + " руб." +
+                           "</div>" +
+                           "</div>";
+        }
+    }
+    
+    else if (currentDashboardTab === "weather") {
+        var currentGlobalHour = (((gameDay - 1) * 24) + gameHour) % weatherHistoryDB.length;
+        var baseRecord = weatherHistoryDB[currentGlobalHour];
+
+        var sampleCities = {
+            "РОСТОВ": "Ростов-на-Дону",
+            "ТЕХАС (TEXAS)": "Хьюстон",
+            "ТОКИО (TOKYO)": "Синдзюку",
+            "БАВАРИЯ (BAVARIA)": "Мюнхен"
+        };
+
+        for (var regionLabel in sampleCities) {
+            var cName = sampleCities[regionLabel];
+            var wObj = EventSystem.getCityLocalWeather(cName, baseRecord, gameDay, gameHour);
+
+            htmlContent += "<div style='margin-bottom:8px; background:rgba(40,45,50,0.5); padding:8px; border-radius:4px; border-left:3px solid #2ecc71;'>"+
+                           "<div style='font-weight:bold; color:#2ecc71; margin-bottom:4px;'>🌍 " + regionLabel + "</div>"+
+                           "<table style='width:100%; font-size:11px; text-align:left;'>"+
+                           "<tr><td>🌡️ Температура:</td><td style='color:#f1c40f'>" + wObj.temp.toFixed(1) + " °C</td></tr>"+
+                           "<tr><td>💧 Осадки:</td><td style='color:#3498db'>" + wObj.rain.toFixed(1) + " мм</td></tr>"+
+                           "<tr><td>💨 Скорость ветра:</td><td style='color:#95a5a6'>" + Math.round(wObj.wind) + " км/ч</td></tr>"+
+                           "<tr><td>⚡ Локальный статус:</td><td style='color:#e74c3c; font-weight:bold;'>" + wObj.name.split(" (")[0] + "</td></tr>"+
+                           "</table>"+
+                           "</div>";
+        }
+    }
+
+    // 4. ОТРИСОВКА ВКЛАДКИ «ГОРОДА» (Новый функционал процессов в городах)
+    else if (currentDashboardTab === "cities") {
+        for (var cityId in citySimulations) {
+            var city = citySimulations[cityId];
+            
+            var bread = city.products["Хлеб"] || { stock: 0, current_price: 0 };
+            var wood = city.products["Дерево"] || { stock: 0, current_price: 0 };
+            var stone = city.products["Камень"] || { stock: 0, current_price: 0 };
+
+            // Краткий индикатор специализации для экономии места
+            var specColor = "#f1c40f";
+            if (city.specializationText.includes("Хлеб")) specColor = "#e67e22";
+            if (city.specializationText.includes("Дерево")) specColor = "#2ecc71";
+            if (city.specializationText.includes("Камень")) specColor = "#95a5a6";
+
+            htmlContent += "<div style='margin-bottom:8px; background:rgba(60,60,60,0.3); padding:8px; border-radius:4px; border-left:3px solid " + specColor + ";'>" +
+                           "<div style='display:flex; justify-content:between; font-weight:bold; font-size:12px; margin-bottom:3px;'>" +
+                           "<span style='color:#fff;'>" + cityId + "</span>" +
+                           "</div>" +
+                           "<div style='font-size:10px; color:" + specColor + "; margin-bottom:4px; font-style:italic;'>" + city.specializationText.split(" (")[0] + "</div>" +
+                           
+                           // Сетка со складами и ценами ресурсов
+                           "<table style='width:100%; border-collapse:collapse; font-size:11px; text-align:left; color:#ccc;'>" +
+                           "<tr style='border-bottom:1px solid rgba(255,255,255,0.1); color:#aaa; font-size:10px;'>" +
+                           "<th>Ресурс</th><th>Склад</th><th>Цена</th>" +
+                           "</tr>" +
+                           "<tr>" +
+                           "<td>🍞 Хлеб</td><td>" + Math.round(bread.stock) + "</td><td style='color:#f1c40f'>" + bread.current_price.toFixed(1) + "</td>" +
+                           "</tr>" +
+                           "<tr>" +
+                           "<td>🪵 Дерево</td><td>" + Math.round(wood.stock) + "</td><td style='color:#f1c40f'>" + wood.current_price.toFixed(1) + "</td>" +
+                           "</tr>" +
+                           "<tr>" +
+                           "<td>🪨 Камень</td><td>" + Math.round(stone.stock) + "</td><td style='color:#f1c40f'>" + stone.current_price.toFixed(1) + "</td>" +
+                           "</tr>" +
+                           "</table>" +
+                           "</div>";
+        }
+    }
+
+    htmlContent += "</div>"; // Закрываем скролл-контейнер
+    dashboard.innerHTML = htmlContent;
+    var newInnerContainer = document.getElementById("dashboard-inner-scroll");
+    if (newInnerContainer) {
+        newInnerContainer.scrollTop = savedScrollTop;
+    }
+        // АКУРАТНО ДОБАВЛЯЕМ В САМЫЙ КОНЕЦ ФУНКЦИИ (перед самой последней скобкой }):
+    
+    var currentSideBtn = document.getElementById("dashboard-sidebar-toggle");
+    if (dashboard && currentSideBtn) {
+        // Если пользователь зафиксировал скрытие панели, принудительно удерживаем её за экраном
+        if (window.isDashboardVisibleGlobal === false) {
+            dashboard.style.left = "-342px";
+            currentSideBtn.style.left = "0px";
+            currentSideBtn.innerText = "▶";
+        } else {
+            // Если панель должна быть открыта, удерживаем её на законном месте
+            dashboard.style.left = "12px";
+            currentSideBtn.style.left = "352px";
+            currentSideBtn.innerText = "◀";
+        }
+    }
+
+}
+
+function recordAndDrawCharts() {
+    // 1. Создаем контейнер графиков снизу экрана, если его нет
+    var chartContainer = document.getElementById("analytics-charts-panel");
+    if (!chartContainer) {
+        chartContainer = document.createElement("div");
+        chartContainer.id = "analytics-charts-panel";
+        chartContainer.style.cssText = "position:fixed; bottom:0; left:0; right:0; height:180px; " +
+                                      "background:rgba(20,20,20,0.96); border-top:2px solid #444; z-index:999; " +
+                                      "display:flex; gap:15px; padding:10px 20px; box-sizing:border-box; " +
+                                      "color:#fff; font-family:Arial, sans-serif;";
+        document.body.appendChild(chartContainer);
+        
+        // Сжимаем основной холст PyVis сверху, чтобы графики его не перекрывали
+        var networkCanvas = document.getElementById("mynetwork");
+        if (networkCanvas) networkCanvas.style.height = "calc(98vh - 180px)";
+    }
+
+    // 2. Сбор текущих макроэкономических метрик
+    totalSimulationHoursCounter++;
+    var totalPriceB = 0, totalPriceW = 0, totalPriceS = 0;
+    var totalGoodsChecked = 0;
+    var emptyStocksCount = 0;
+
+    for (var cityId in citySimulations) {
+        var city = citySimulations[cityId];
+        totalPriceB += city.products["Хлеб"].current_price;
+        totalPriceW += city.products["Дерево"].current_price;
+        totalPriceS += city.products["Камень"].current_price;
+        totalGoodsChecked += 3;
+
+        if (city.products["Хлеб"].stock <= 0.05) emptyStocksCount++;
+        if (city.products["Дерево"].stock <= 0.05) emptyStocksCount++;
+        if (city.products["Камень"].stock <= 0.05) emptyStocksCount++;
+    }
+
+    var totalProfitCombined = 0;
+    var totalTripsCombined = 0;
+    if (typeof roadNetwork !== "undefined" && Array.isArray(roadNetwork)) {
+        roadNetwork.forEach(function(road) {
+            totalProfitCombined += (road.totalProfit || 0);
+            totalTripsCombined += (road.totalTrips || 0);
+        });
+    }
+
+    // Записываем средние значения текущего часа в массивы трендов
+    chartsHistory.hours.push(totalSimulationHoursCounter);
+    chartsHistory.breadPrices.push(totalPriceB / Object.keys(citySimulations).length);
+    chartsHistory.woodPrices.push(totalPriceW / Object.keys(citySimulations).length);
+    chartsHistory.stonePrices.push(totalPriceS / Object.keys(citySimulations).length);
+    chartsHistory.emptyStockShares.push((emptyStocksCount / totalGoodsChecked) * 100);
+    chartsHistory.avgRouteProfits.push(totalTripsCombined > 0 ? (totalProfitCombined / totalTripsCombined) : 0);
+
+    // Ограничиваем историю последних 120 точек, чтобы графики не сжимались до нечитаемости
+    if (chartsHistory.hours.length > 120) {
+        for (var key in chartsHistory) chartsHistory[key].shift();
+    }
+
+    // 3. Функция генерации SVG-полилинии по массиву данных
+    function generateSVGLine(dataArr, minVal, maxVal, width, height, color) {
+        if (dataArr.length < 2) return "";
+        var points = [];
+        var stepX = width / (dataArr.length - 1);
+        var valRange = (maxVal - minVal) === 0 ? 1 : (maxVal - minVal);
+        
+        for (var i = 0; i < dataArr.length; i++) {
+            var x = i * stepX;
+            var y = height - (((dataArr[i] - minVal) / valRange) * height);
+            points.push(x + "," + y);
+        }
+        return "<polyline points='" + points.join(" ") + "' style='fill:none;stroke:" + color + ";stroke-width:2' />";
+    }
+
+    // 4. Отрисовка трех SVG панелей
+    var w = Math.floor((window.innerWidth - 80) / 3); // Динамическая ширина под размер окна
+    var h = 115;
+
+    // График 1: Цены товаров
+    var maxP = Math.max(Math.max.apply(null, chartsHistory.breadPrices), Math.max.apply(null, chartsHistory.woodPrices), Math.max.apply(null, chartsHistory.stonePrices), 40);
+    var minP = Math.min(Math.min.apply(null, chartsHistory.breadPrices), Math.min.apply(null, chartsHistory.woodPrices), Math.min.apply(null, chartsHistory.stonePrices), 10);
+    var svgPrices = "<svg width='" + w + "' height='" + h + "' style='background:#111;border:1px solid #333;margin-top:5px;'>" +
+        generateSVGLine(chartsHistory.breadPrices, minP, maxP, w, h, "#e67e22") +
+        generateSVGLine(chartsHistory.woodPrices, minP, maxP, w, h, "#2ecc71") +
+        generateSVGLine(chartsHistory.stonePrices, minP, maxP, w, h, "#95a5a6") +
+        "</svg>";
+
+    // График 2: Дефицит (Пустые склады)
+    var maxE = Math.max(Math.max.apply(null, chartsHistory.emptyStockShares), 20);
+    var svgEmpty = "<svg width='" + w + "' height='" + h + "' style='background:#111;border:1px solid #333;margin-top:5px;'>" +
+        generateSVGLine(chartsHistory.emptyStockShares, 0, maxE, w, h, "#e74c3c") +
+        "</svg>";
+
+    // График 3: Средняя прибыль рейса
+    var maxPr = Math.max(Math.max.apply(null, chartsHistory.avgRouteProfits), 50);
+    var minPr = Math.min(Math.min.apply(null, chartsHistory.avgRouteProfits), 0);
+    var svgProfits = "<svg width='" + w + "' height='" + h + "' style='background:#111;border:1px solid #333;margin-top:5px;'>" +
+        generateSVGLine(chartsHistory.avgRouteProfits, minPr, maxPr, w, h, "#f1c40f") +
+        "</svg>";
+
+    // Внедряем сформированные блоки в HTML панель
+    chartContainer.innerHTML = 
+        "<div style='flex:1; display:flex; flex-direction:column;'>" +
+            "<div style='font-size:11px;font-weight:bold;color:#aaa;'>📈 СРЕДНИЕ ЦЕНЫ (<span style='color:#e67e22'>🍞 Хлеб</span> | <span style='color:#2ecc71'>🪵 Дерево</span> | <span style='color:#95a5a6'>🪨 Камень</span>)</div>" +
+            svgPrices +
+            "<div style='display:flex;justify-content:space-between;font-size:10px;color:#666;'><span>Мин: " + minP.toFixed(1) + " р.</span><span>Макс: " + maxP.toFixed(1) + " р.</span></div>" +
+        "</div>" +
+        "<div style='flex:1; display:flex; flex-direction:column;'>" +
+            "<div style='font-size:11px;font-weight:bold;color:#aaa;'>🚨 ДОЛЯ ВРЕМЕНИ С ПУСТЫМ СКЛАДОМ (<span style='color:#e74c3c'>% Дефицита</span>)</div>" +
+            svgEmpty +
+            "<div style='display:flex;justify-content:space-between;font-size:10px;color:#666;'><span>0%</span><span>Текущий: " + chartsHistory.emptyStockShares[chartsHistory.emptyStockShares.length - 1].toFixed(1) + "%</span></div>" +
+        "</div>" +
+        "<div style='flex:1; display:flex; flex-direction:column;'>" +
+            "<div style='font-size:11px;font-weight:bold;color:#aaa;'>💰 СРЕДНЯЯ ПРИБЫЛЬ МАРШРУТОВ (<span style='color:#f1c40f'>руб. / рейс</span>)</div>" +
+            svgProfits +
+            "<div style='display:flex;justify-content:space-between;font-size:10px;color:#666;'><span>Мин: " + minPr.toFixed(0) + " р.</span><span>Макс: " + maxPr.toFixed(0) + " р.</span></div>" +
+        "</div>";
 }
