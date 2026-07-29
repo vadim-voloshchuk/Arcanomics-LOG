@@ -4,8 +4,7 @@ var gameMinute = 0;
 var gameHour = 6;
 var gameDay = 1;
 
-// Experiment configuration. Change only this value to compare price models.
-var ACTIVE_PRICE_MODEL = "market"; // "market", "linear" or "inertia"
+var ACTIVE_PRICE_MODEL = "market"; 
 var EXPERIMENT_SEED = 123456789;
 var randomState = EXPERIMENT_SEED >>> 0;
 
@@ -16,7 +15,6 @@ function seededRandom() {
 
 var cityHourLogs = [];
 var roadHourLogs = [];
-
 var citySimulations = {};
 var roadNetwork = __ROAD_DATA__;
 var goodsTemplate = __GOODS_DATA__;
@@ -26,31 +24,24 @@ function initializeCitySimulations() {
     nodeIds.forEach(function(id) {
         var nodeData = nodes.get(id);
         var basePop = nodeData.population_base || Math.floor(seededRandom() * (180000 - 40000) + 40000);
-
         var cityProducts = JSON.parse(JSON.stringify(goodsTemplate));
 
-        // --- ПРОДВИНУТЫЙ ЭКОНОМИЧЕСКИЙ ДВИЖОК ---
-        // Считаем средние показатели климата из API, чтобы понять географию города
-        // --- ПРОДВИНУТЫЙ ЭКОНОМИЧЕСКИЙ ДВИЖОК ---
+        var rnd = seededRandom();
+        var specialization;
 
-        const rnd = seededRandom();
-var specialization;
+        if (rnd < 0.35) {
+            specialization = "Агрокомплекс (Выпуск: Хлеб)";
+        } else if (rnd < 0.60) {
+            specialization = "Промышленность (Выпуск: Дерево)";
+        } else if (rnd < 0.80) {
+            specialization = "Горнодобыча (Выпуск: Камень)";
+        } else {
+            specialization = "Торговый Хаб (Выпуск: Высокие технологии | Спрос на сырье)";
+        }
 
-if (rnd < 0.35) {
-    specialization = "Агрокомплекс (Выпуск: Хлеб)";
-} else if (rnd < 0.60) {
-    specialization = "Промышленность (Выпуск: Дерево)";
-} else if (rnd < 0.80) {
-    specialization = "Горнодобыча (Выпуск: Камень)";
-} else {
-    specialization = "Торговый Хаб (Выпуск: Высокие технологии | Спрос на сырье)";
-}
-
-
-        // Балансируем стартовые склады в зависимости от выбранного профиля
         if (specialization.includes("Хлеб")) {
-            cityProducts["Хлеб"].stock = 120; // Избыток своего товара для старта торговли
-            cityProducts["Хлеб"].base_price = 25; // Своё производство — дешевле
+            cityProducts["Хлеб"].stock = 120; 
+            cityProducts["Хлеб"].base_price = 25; 
         } else if (specialization.includes("Дерево")) {
             cityProducts["Дерево"].stock = 120;
             cityProducts["Дерево"].base_price = 20;
@@ -58,7 +49,6 @@ if (rnd < 0.35) {
             cityProducts["Камень"].stock = 120;
             cityProducts["Камень"].base_price = 15;
         } else if (specialization.includes("Торговый Хаб")) {
-            // Хабы имеют огромные склады, но мало ресурсов на старте (готовы скупать)
             cityProducts["Хлеб"].stock = 20;  cityProducts["Хлеб"].base_price = 55;
             cityProducts["Дерево"].stock = 20; cityProducts["Дерево"].base_price = 45;
             cityProducts["Камень"].stock = 20; cityProducts["Камень"].base_price = 35;
@@ -72,4 +62,12 @@ if (rnd < 0.35) {
             currentEvent: "Нет активных погодных событий"
         };
     });
+
+    // ХАК: Рассчитываем экономику и логистику один раз при старте страницы, 
+    // чтобы заполнить тултипы и убрать текст "Расчет..." до клика на кнопку
+    for (var id in citySimulations) {
+        updateCityEconomy(id, citySimulations[id], "06:00:00");
+    }
+    updateRoadLogistics();
 }
+var weatherHistoryDB = __WEATHER_HISTORY_DATA__;
