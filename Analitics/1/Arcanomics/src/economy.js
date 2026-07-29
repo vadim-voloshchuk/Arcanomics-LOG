@@ -4,7 +4,7 @@ function updateCityEconomy(id, data, exactTimeString) {
     for (var pName in data.products) {
         var item = data.products[pName];
         var baseProductVolume = 0;
-        var weatherModifiers = EventSystem.getModifiers(pName);
+        var weatherModifiers = EventSystem.getModifiers(data.localEventObject, pName);
 
         if (data.specializationText.includes("Торговый Хаб")) {
             if (pName === "Хлеб") baseProductVolume = 0.25;
@@ -36,15 +36,15 @@ function updateCityEconomy(id, data, exactTimeString) {
 
         var currentPrice;
         if (ACTIVE_PRICE_MODEL === "market") {
-            var ratio = supply === 0 ? 1.3 : demand / supply;
-            ratio = Math.max(0.7, Math.min(ratio, 1.3));
+            var ratio = supply === 0 ? 3.5 : demand / supply;
+            ratio = Math.max(0.3, Math.min(ratio, 3.5));
             currentPrice = item.base_price * ratio;
         } else if (ACTIVE_PRICE_MODEL === "linear") {
             currentPrice = item.base_price + (demand - currentProdPerHour) * 1.5 - item.stock * 0.2;
-            currentPrice = Math.max(10, Math.min(currentPrice, 120));
+            currentPrice = Math.max(item.base_price * 0.4, Math.min(currentPrice, 120));
         } else if (ACTIVE_PRICE_MODEL === "inertia") {
             currentPrice = item.last_price + (demand - currentProdPerHour) * 0.8 - item.stock * 0.1;
-            currentPrice = Math.max(10, Math.min(currentPrice, 120));
+            currentPrice = Math.max(item.base_price * 0.4, Math.min(currentPrice, 120));
         } else {
             throw new Error("Unknown ACTIVE_PRICE_MODEL: " + ACTIVE_PRICE_MODEL);
         }
