@@ -23,6 +23,34 @@ def get_region_cities(region_name: str, max_cities: int = 5) -> list[dict]:
         try:
             with open(cities_file, "r", encoding="utf-8") as f:
                 db = json.load(f)
+                # Убрали принудительное переименование в "rostov_default"
+                if key in db:
+                    return db[key][:max_cities]
+        except Exception as e:
+            print(f"⚠️ Ошибка чтения cities.json: {e}")
+
+    seed = sum(ord(char) for char in key)
+    base_lat, base_lon = 30.0 + (seed % 25), -20.0 + (seed % 100)
+
+    procedural_cities = []
+    names_pool = ["Центр", "Север", "Юг", "Восток", "Запад"]
+    for i in range(min(max_cities, len(names_pool))):
+        offset_lat = math.sin(i * 45) * 0.4
+        offset_lon = math.cos(i * 45) * 0.6
+        pop = 500000 if i == 0 else math.floor(30000 + (200000 * ((seed + i) % 100 / 100)))
+        procedural_cities.append({
+            "name": f"{region_name} - {names_pool[i]}", "lat": base_lat + offset_lat, "lon": base_lon + offset_lon, "population": pop
+        })
+    return procedural_cities
+
+    """Ищет один конкретный регион в cities.json или делает процедурный откат."""
+    key = region_name.strip().lower()
+    cities_file = DATA_DIR / "cities.json"
+
+    if cities_file.exists():
+        try:
+            with open(cities_file, "r", encoding="utf-8") as f:
+                db = json.load(f)
                 if key in ["ростов", "ростовская область", "rostov"]:
                     key = "rostov_default"
                 if key in db:
@@ -83,16 +111,37 @@ def create_graph() -> tuple[Network, list[dict[str, Any]]]:
         print("❌ Не удалось загрузить ни одного города.")
         return net, []
 
+    # Шаг 2: Добавляем города с масштабированием географических координат под экран
     # Шаг 2: Добавляем города без внешних погодных данных.
     for c in all_compiled_cities:
         graph.add_node(c["name"], population=c["population"], lat=c["lat"], lon=c["lon"], region=c["region_part"])
 
+        # Проекция координат, чтобы города красиво вставали на экране в зависимости от региона
+        region_key = c["region_part"].lower()
+        if "tokyo" in region_key:
+            x_coord = (c["lon"] - 139.70) * 8000
+            y_coord = (c["lat"] - 35.65) * -8000
+        elif "texas" in region_key:
+            x_coord = (c["lon"] + 97.0) * 150
+            y_coord = (c["lat"] - 31.0) * -150
+        elif "bavaria" in region_key:
+            x_coord = (c["lon"] - 11.0) * 400
+            y_coord = (c["lat"] - 48.5) * -400
+        else:  # rostov
+            x_coord = (c["lon"] - 39.0) * 600
+            y_coord = (c["lat"] - 47.0) * -600
+
         net.add_node(
             c["name"], label=c["name"], title="",
+            x=x_coord, y=y_coord,
             size=38 if c["is_capital"] else (26 if c["population"] > 500000 else 20),
             color="#f1c40f" if c["is_capital"] else ("#3498db" if c["population"] > 500000 else "#2ecc71"),
-            population_base=c["population"]
+            population_base=c["population"],
+            region=c["region_part"].lower().strip() # <-- Передаем чистый ключ региона ("bavaria", "tokyo" и т.д.)
         )
+
+
+
 
     # Шаг 3: Строим внутренние дороги регионов
     for part in region_parts:
@@ -143,12 +192,21 @@ def create_graph() -> tuple[Network, list[dict[str, Any]]]:
             font={"size": 13, "color": "#ffffff", "align": "top"},
         )
 
-    net.toggle_physics(True)
+    # 1. Отключаем динамическую физику перемещения, чтобы узлы стояли строго на своих местах
+    net.toggle_physics(False) 
+    
+    # 2. Оставляем только базовые интерактивные настройки без стабилизации
     net.set_options('''{
       "physics": {
-        "barnesHut": { "gravitationalConstant": -4500, "centralGravity": 0.15, "springLength": 200, "springConstant": 0.04 },
-        "stabilization": { "enabled": true, "iterations": 180, "updateInterval": 25 }
+        "enabled": false
       },
-      "interaction": { "hover": true, "tooltipDelay": 10 }
+      "interaction": { 
+        "hover": true, 
+        "tooltipDelay": 10,
+        "dragNodes": true,
+        "zoomView": true,
+        "dragView": true
+      }
     }''')
+    
     return net, roads_data_for_js
