@@ -23,20 +23,17 @@ def run_full_analytics():
 
     # --- 1. ВОЛАТИЛЬНОСТЬ ЦЕН ---
     # Вычисляем коэффициент вариации (стандартное отклонение / среднее значение)
-    for product, col in [("Хлеб", "bread"), ("Дерево", "wood"), ("Камень", "stone")]:
+    for product, col in [("Commodity A", "bread"), ("Commodity B", "wood"), ("Commodity C", "stone")]:
         mean_p = df_prices[col].mean()
         std_p = df_prices[col].std()
         volatility = (std_p / mean_p) * 100 if mean_p > 0 else 0
-        print(f"📈 Волатильность цены [{product}]: {volatility:.2f}% (Ср. цена: {mean_p:.1f} руб.)")
+        print(f"📈 Price volatility [{product}]: {volatility:.2f}% (Average price: {mean_p:.1f} units)")
     print("-" * 50)
 
-    # --- 2. ДОЛЯ ВРЕМЕНИ С ПУСТЫМ СКЛАДОМ & СТАТИСТИКА МАРШРУТОВ ---
-    # Так как детальные логи складов идут в cityHourLogs (который у вас не выгружается в файл),
-    # мы можем косвенно определить дефицит через взлет цен выше базовой в price_history.
-    # Для хлеба базовая цена в агрокомплексах 25, в хабах 55. Если средняя цена по карте > 45, это жесткий дефицит.
+    # --- 2. STOCKOUT RATE & ROUTE SUMMARY ---
     high_bread_days = (df_prices["bread"] > 40).sum()
     starvation_share = (high_bread_days / len(df_prices)) * 100
-    print(f"🚨 Доля дней с критическим дефицитом Хлеба (пустые склады): {starvation_share:.1f}%")
+    print(f"🚨 Share of days with critical Commodity A shortfall (empty stock): {starvation_share:.1f}%")
     print("-" * 50)
 
     # --- 3. ВРЕМЯ ВОССТАНОВЛЕНИЯ ПОСЛЕ ПОГОДНЫХ СОБЫТИЙ ---
