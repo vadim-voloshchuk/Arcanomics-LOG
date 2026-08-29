@@ -3,6 +3,7 @@ var SIMULATION_DURATION_HOURS = 30 * 24;
 var completedGameHours = 0;
 var simulationTimer = null;
 var simulationStarted = false;
+var simulationPaused = false;
 var simulationLogRows = [];
 var priceHistoryRows = [];
 
@@ -20,6 +21,8 @@ window.onload = function () {
     var priceModelSelect = document.getElementById("priceModelSelect");
     var durationInput = document.getElementById("simulationDurationInput");
     var startButton = document.getElementById("startSimulationButton");
+    var pauseButton = document.getElementById("pauseSimulationButton");
+    var resumeButton = document.getElementById("resumeSimulationButton");
 
     priceModelSelect.value = ACTIVE_PRICE_MODEL;
     durationInput.value = SIMULATION_DURATION_HOURS / 24;
@@ -32,11 +35,18 @@ window.onload = function () {
         setSimulationDurationFromInput(durationInput);
     });
     startButton.addEventListener("click", function() {
-        if (simulationStarted) return;
+        if (simulationStarted && !simulationPaused) return;
         var durationDays = setSimulationDurationFromInput(durationInput, false);
         startSimulation(durationDays);
-        startButton.disabled = true;
     });
+    pauseButton.addEventListener("click", function() {
+        pauseSimulation();
+    });
+    resumeButton.addEventListener("click", function() {
+        resumeSimulation();
+    });
+
+    updateSimulationControls();
 };
 
 function setSimulationDurationFromInput(durationInput, shouldLog) {
@@ -48,8 +58,40 @@ function setSimulationDurationFromInput(durationInput, shouldLog) {
     return durationDays;
 }
 
+function updateSimulationControls() {
+    var startButton = document.getElementById("startSimulationButton");
+    var pauseButton = document.getElementById("pauseSimulationButton");
+    var resumeButton = document.getElementById("resumeSimulationButton");
+
+    if (!startButton || !pauseButton || !resumeButton) return;
+
+    if (!simulationStarted) {
+        startButton.disabled = false;
+        pauseButton.disabled = true;
+        resumeButton.disabled = true;
+        return;
+    }
+
+    if (simulationPaused) {
+        startButton.disabled = true;
+        pauseButton.disabled = true;
+        resumeButton.disabled = false;
+    } else {
+        startButton.disabled = true;
+        pauseButton.disabled = false;
+        resumeButton.disabled = true;
+    }
+}
+
 function startSimulation(durationDays) {
+    if (simulationTimer) {
+        clearInterval(simulationTimer);
+        simulationTimer = null;
+    }
+
     simulationStarted = true;
+    simulationPaused = false;
+    completedGameHours = 0;
     EventSystem.reset();
     simulationLogRows = [];
     priceHistoryRows = [];
@@ -60,8 +102,6 @@ function startSimulation(durationDays) {
     console.log("Random seed: " + EXPERIMENT_SEED);
     console.log("==================================================");
 
-    // Каждые 500 миллисекунд (полсекунды) игровое время прыгает на 20 минут.
-    // Таким образом, один игровой час пролетит всего за 1.5 секунды реального времени!
     simulationTimer = setInterval(function() {
         gameMinute += 20;
         if (gameMinute >= 60) {
@@ -75,6 +115,37 @@ function startSimulation(durationDays) {
         if (gameMinute === 0) runSimulationHour();
     }, 500);
     runSimulationHour();
+    updateSimulationControls();
+}
+
+function pauseSimulation() {
+    if (!simulationStarted || simulationPaused) return;
+    simulationPaused = true;
+    if (simulationTimer) {
+        clearInterval(simulationTimer);
+        simulationTimer = null;
+    }
+    console.log("Simulation paused");
+    updateSimulationControls();
+}
+
+function resumeSimulation() {
+    if (!simulationStarted || !simulationPaused) return;
+    simulationPaused = false;
+    simulationTimer = setInterval(function() {
+        gameMinute += 20;
+        if (gameMinute >= 60) {
+            gameMinute = 0;
+            gameHour++;
+        }
+        if (gameHour >= 24) {
+            gameHour = 0;
+            gameDay++;
+        }
+        if (gameMinute === 0) runSimulationHour();
+    }, 500);
+    console.log("Simulation resumed");
+    updateSimulationControls();
 }
 
 function runSimulationHour() {
@@ -85,7 +156,13 @@ function runSimulationHour() {
     recordAndDrawCharts();
     completedGameHours++;
     if (completedGameHours >= SIMULATION_DURATION_HOURS) {
-        clearInterval(simulationTimer);
+        if (simulationTimer) {
+            clearInterval(simulationTimer);
+            simulationTimer = null;
+        }
+        simulationStarted = false;
+        simulationPaused = false;
+        updateSimulationControls();
         downloadSimulationResults();
     }
 }
@@ -134,7 +211,7 @@ function recordDailySimulationData() {
         price_multiplier: modifiers.priceMultiplier
     });
 
-    var totals = { "Хлеб": 0, "Дерево": 0, "Камень": 0 };
+    var totals = { "Commodity A": 0, "Commodity B": 0, "Commodity C": 0 };
     var cityCount = 0;
     for (var cityId in citySimulations) {
         cityCount++;
@@ -142,9 +219,9 @@ function recordDailySimulationData() {
     }
     priceHistoryRows.push({
         day: gameDay,
-        bread: cityCount ? totals["Хлеб"] / cityCount : 0,
-        wood: cityCount ? totals["Дерево"] / cityCount : 0,
-        stone: cityCount ? totals["Камень"] / cityCount : 0,
+        bread: cityCount ? totals["Commodity A"] / cityCount : 0,
+        wood: cityCount ? totals["Commodity B"] / cityCount : 0,
+        stone: cityCount ? totals["Commodity C"] / cityCount : 0,
         event: EventSystem.getEventName()
     });
 }
@@ -289,29 +366,29 @@ function updateRegionalDashboard() {
         for (var cityId in citySimulations) {
             var city = citySimulations[cityId];
             var rawNode = typeof nodes !== "undefined" ? nodes.get(cityId) : null;
-            var regionName = (rawNode && rawNode.region) ? rawNode.region : "Глобальный";
+            var regionName = (rawNode && rawNode.region) ? rawNode.region : "Global";
             regionName = regionName.charAt(0).toUpperCase() + regionName.slice(1);
 
             if (!regions[regionName]) {
                 regions[regionName] = {
                     citiesCount: 0,
-                    weather: city.currentEvent || "Ясно",
+                    weather: city.currentEvent || "Clear",
                     breadPrices: [], woodPrices: [], stonePrices: [],
                     tripsCount: 0
                 };
             }
             
             regions[regionName].citiesCount++;
-            if (city.products["Хлеб"]) regions[regionName].breadPrices.push(city.products["Хлеб"].current_price);
-            if (city.products["Дерево"]) regions[regionName].woodPrices.push(city.products["Дерево"].current_price);
-            if (city.products["Камень"]) regions[regionName].stonePrices.push(city.products["Камень"].current_price);
+            if (city.products["Commodity A"]) regions[regionName].breadPrices.push(city.products["Commodity A"].current_price);
+            if (city.products["Commodity B"]) regions[regionName].woodPrices.push(city.products["Commodity B"].current_price);
+            if (city.products["Commodity C"]) regions[regionName].stonePrices.push(city.products["Commodity C"].current_price);
         }
 
         if (typeof roadNetwork !== "undefined" && Array.isArray(roadNetwork)) {
             roadNetwork.forEach(function(road) {
                 var trips = road.totalTrips || 0;
                 var nodeA = typeof nodes !== "undefined" ? nodes.get(road.u) : null;
-                var rName = (nodeA && nodeA.region) ? nodeA.region : "Глобальный";
+                var rName = (nodeA && nodeA.region) ? nodeA.region : "Global";
                 rName = rName.charAt(0).toUpperCase() + rName.slice(1);
                 if (regions[rName]) {
                     regions[rName].tripsCount += trips;
@@ -326,13 +403,13 @@ function updateRegionalDashboard() {
             var avgStone = rData.stonePrices.length ? (rData.stonePrices.reduce(function(a,b){return a+b;}, 0) / rData.stonePrices.length) : 0;
 
             htmlContent += "<div style='margin-bottom:10px; background:rgba(50,50,50,0.4); padding:8px; border-radius:4px; border-left:3px solid #3498db;'>" +
-                           "<div style='font-weight:bold; color:#3498db; font-size:13px; margin-bottom:4px;'>" + rKey + " (" + rData.citiesCount + " г.)</div>" +
-                           "<div style='margin-bottom:2px;'>🌤️ Погода: <span style='color:#e74c3c;'>" + rData.weather + "</span></div>" +
-                           "<div style='margin-bottom:4px;'>🚚 Всего рейсов: <span style='color:#2ecc71; font-weight:bold;'>"+ rData.tripsCount +"</span></div>" +
+                           "<div style='font-weight:bold; color:#3498db; font-size:13px; margin-bottom:4px;'>" + rKey + " (" + rData.citiesCount + " nodes)</div>" +
+                           "<div style='margin-bottom:2px;'>🌤️ Weather: <span style='color:#e74c3c;'>" + rData.weather + "</span></div>" +
+                           "<div style='margin-bottom:4px;'>🚚 Total trips: <span style='color:#2ecc71; font-weight:bold;'>"+ rData.tripsCount +"</span></div>" +
                            "<div style='font-size:11px; color:#ddd; line-height:1.4;'>" +
-                           "• Ср. цена Хлеба: " + avgBread.toFixed(1) + " руб.<br>" +
-                           "• Ср. цена Дерева: " + avgWood.toFixed(1) + " руб.<br>" +
-                           "• Ср. цена Камня: " + avgStone.toFixed(1) + " руб." +
+                           "• Avg. Commodity A price: " + avgBread.toFixed(1) + " units<br>" +
+                           "• Avg. Commodity B price: " + avgWood.toFixed(1) + " units<br>" +
+                           "• Avg. Commodity C price: " + avgStone.toFixed(1) + " units" +
                            "</div>" +
                            "</div>";
         }
@@ -342,27 +419,21 @@ function updateRegionalDashboard() {
         var currentGlobalHour = (((gameDay - 1) * 24) + gameHour) % weatherHistoryDB.length;
         var baseRecord = weatherHistoryDB[currentGlobalHour];
 
-        var sampleCities = {
-            "РОСТОВ": "Ростов-на-Дону",
-            "ТЕХАС (TEXAS)": "Хьюстон",
-            "ТОКИО (TOKYO)": "Синдзюку",
-            "БАВАРИЯ (BAVARIA)": "Мюнхен"
-        };
-
-        for (var regionLabel in sampleCities) {
-            var cName = sampleCities[regionLabel];
+        var sampleCityIds = Object.keys(citySimulations).slice(0, 4);
+        sampleCityIds.forEach(function(cityId, idx) {
+            var cName = cityId;
             var wObj = EventSystem.getCityLocalWeather(cName, baseRecord, gameDay, gameHour);
 
             htmlContent += "<div style='margin-bottom:8px; background:rgba(40,45,50,0.5); padding:8px; border-radius:4px; border-left:3px solid #2ecc71;'>"+
-                           "<div style='font-weight:bold; color:#2ecc71; margin-bottom:4px;'>🌍 " + regionLabel + "</div>"+
+                           "<div style='font-weight:bold; color:#2ecc71; margin-bottom:4px;'>🌍 Sample region " + (idx + 1) + "</div>"+
                            "<table style='width:100%; font-size:11px; text-align:left;'>"+
-                           "<tr><td>🌡️ Температура:</td><td style='color:#f1c40f'>" + wObj.temp.toFixed(1) + " °C</td></tr>"+
-                           "<tr><td>💧 Осадки:</td><td style='color:#3498db'>" + wObj.rain.toFixed(1) + " мм</td></tr>"+
-                           "<tr><td>💨 Скорость ветра:</td><td style='color:#95a5a6'>" + Math.round(wObj.wind) + " км/ч</td></tr>"+
-                           "<tr><td>⚡ Локальный статус:</td><td style='color:#e74c3c; font-weight:bold;'>" + wObj.name.split(" (")[0] + "</td></tr>"+
+                           "<tr><td>🌡️ Temperature:</td><td style='color:#f1c40f'>" + wObj.temp.toFixed(1) + " °C</td></tr>"+
+                           "<tr><td>💧 Rain:</td><td style='color:#3498db'>" + wObj.rain.toFixed(1) + " mm</td></tr>"+
+                           "<tr><td>💨 Wind:</td><td style='color:#95a5a6'>" + Math.round(wObj.wind) + " km/h</td></tr>"+
+                           "<tr><td>⚡ Local status:</td><td style='color:#e74c3c; font-weight:bold;'>" + wObj.name.split(" (")[0] + "</td></tr>"+
                            "</table>"+
                            "</div>";
-        }
+        });
     }
 
     // 4. ОТРИСОВКА ВКЛАДКИ «ГОРОДА» (Новый функционал процессов в городах)
@@ -370,35 +441,33 @@ function updateRegionalDashboard() {
         for (var cityId in citySimulations) {
             var city = citySimulations[cityId];
             
-            var bread = city.products["Хлеб"] || { stock: 0, current_price: 0 };
-            var wood = city.products["Дерево"] || { stock: 0, current_price: 0 };
-            var stone = city.products["Камень"] || { stock: 0, current_price: 0 };
+            var bread = city.products["Commodity A"] || { stock: 0, current_price: 0 };
+            var wood = city.products["Commodity B"] || { stock: 0, current_price: 0 };
+            var stone = city.products["Commodity C"] || { stock: 0, current_price: 0 };
 
-            // Краткий индикатор специализации для экономии места
             var specColor = "#f1c40f";
-            if (city.specializationText.includes("Хлеб")) specColor = "#e67e22";
-            if (city.specializationText.includes("Дерево")) specColor = "#2ecc71";
-            if (city.specializationText.includes("Камень")) specColor = "#95a5a6";
+            if (city.specializationText.includes("Commodity A")) specColor = "#e67e22";
+            if (city.specializationText.includes("Commodity B")) specColor = "#2ecc71";
+            if (city.specializationText.includes("Commodity C")) specColor = "#95a5a6";
 
             htmlContent += "<div style='margin-bottom:8px; background:rgba(60,60,60,0.3); padding:8px; border-radius:4px; border-left:3px solid " + specColor + ";'>" +
                            "<div style='display:flex; justify-content:between; font-weight:bold; font-size:12px; margin-bottom:3px;'>" +
                            "<span style='color:#fff;'>" + cityId + "</span>" +
                            "</div>" +
                            "<div style='font-size:10px; color:" + specColor + "; margin-bottom:4px; font-style:italic;'>" + city.specializationText.split(" (")[0] + "</div>" +
-                           
-                           // Сетка со складами и ценами ресурсов
+                            
                            "<table style='width:100%; border-collapse:collapse; font-size:11px; text-align:left; color:#ccc;'>" +
                            "<tr style='border-bottom:1px solid rgba(255,255,255,0.1); color:#aaa; font-size:10px;'>" +
-                           "<th>Ресурс</th><th>Склад</th><th>Цена</th>" +
+                           "<th>Commodity</th><th>Stock</th><th>Price</th>" +
                            "</tr>" +
                            "<tr>" +
-                           "<td>🍞 Хлеб</td><td>" + Math.round(bread.stock) + "</td><td style='color:#f1c40f'>" + bread.current_price.toFixed(1) + "</td>" +
+                           "<td>Commodity A</td><td>" + Math.round(bread.stock) + "</td><td style='color:#f1c40f'>" + bread.current_price.toFixed(1) + "</td>" +
                            "</tr>" +
                            "<tr>" +
-                           "<td>🪵 Дерево</td><td>" + Math.round(wood.stock) + "</td><td style='color:#f1c40f'>" + wood.current_price.toFixed(1) + "</td>" +
+                           "<td>Commodity B</td><td>" + Math.round(wood.stock) + "</td><td style='color:#f1c40f'>" + wood.current_price.toFixed(1) + "</td>" +
                            "</tr>" +
                            "<tr>" +
-                           "<td>🪨 Камень</td><td>" + Math.round(stone.stock) + "</td><td style='color:#f1c40f'>" + stone.current_price.toFixed(1) + "</td>" +
+                           "<td>Commodity C</td><td>" + Math.round(stone.stock) + "</td><td style='color:#f1c40f'>" + stone.current_price.toFixed(1) + "</td>" +
                            "</tr>" +
                            "</table>" +
                            "</div>";
@@ -455,14 +524,14 @@ function recordAndDrawCharts() {
 
     for (var cityId in citySimulations) {
         var city = citySimulations[cityId];
-        totalPriceB += city.products["Хлеб"].current_price;
-        totalPriceW += city.products["Дерево"].current_price;
-        totalPriceS += city.products["Камень"].current_price;
+        totalPriceB += city.products["Commodity A"].current_price;
+        totalPriceW += city.products["Commodity B"].current_price;
+        totalPriceS += city.products["Commodity C"].current_price;
         totalGoodsChecked += 3;
 
-        if (city.products["Хлеб"].stock <= 0.05) emptyStocksCount++;
-        if (city.products["Дерево"].stock <= 0.05) emptyStocksCount++;
-        if (city.products["Камень"].stock <= 0.05) emptyStocksCount++;
+        if (city.products["Commodity A"].stock <= 0.05) emptyStocksCount++;
+        if (city.products["Commodity B"].stock <= 0.05) emptyStocksCount++;
+        if (city.products["Commodity C"].stock <= 0.05) emptyStocksCount++;
     }
 
     var totalProfitCombined = 0;
@@ -528,21 +597,21 @@ function recordAndDrawCharts() {
         generateSVGLine(chartsHistory.avgRouteProfits, minPr, maxPr, w, h, "#f1c40f") +
         "</svg>";
 
-    // Внедряем сформированные блоки в HTML панель
+    // Inserting finalized chart blocks into the HTML dashboard.
     chartContainer.innerHTML = 
         "<div style='flex:1; display:flex; flex-direction:column;'>" +
-            "<div style='font-size:11px;font-weight:bold;color:#aaa;'>📈 СРЕДНИЕ ЦЕНЫ (<span style='color:#e67e22'>🍞 Хлеб</span> | <span style='color:#2ecc71'>🪵 Дерево</span> | <span style='color:#95a5a6'>🪨 Камень</span>)</div>" +
+            "<div style='font-size:11px;font-weight:bold;color:#aaa;'>📈 AVERAGE PRICES (<span style='color:#e67e22'>Commodity A</span> | <span style='color:#2ecc71'>Commodity B</span> | <span style='color:#95a5a6'>Commodity C</span>)</div>" +
             svgPrices +
-            "<div style='display:flex;justify-content:space-between;font-size:10px;color:#666;'><span>Мин: " + minP.toFixed(1) + " р.</span><span>Макс: " + maxP.toFixed(1) + " р.</span></div>" +
+            "<div style='display:flex;justify-content:space-between;font-size:10px;color:#666;'><span>Min: " + minP.toFixed(1) + " u.</span><span>Max: " + maxP.toFixed(1) + " u.</span></div>" +
         "</div>" +
         "<div style='flex:1; display:flex; flex-direction:column;'>" +
-            "<div style='font-size:11px;font-weight:bold;color:#aaa;'>🚨 ДОЛЯ ВРЕМЕНИ С ПУСТЫМ СКЛАДОМ (<span style='color:#e74c3c'>% Дефицита</span>)</div>" +
+            "<div style='font-size:11px;font-weight:bold;color:#aaa;'>🚨 EMPTY-STOCK SHARE (<span style='color:#e74c3c'>Shortage %</span>)</div>" +
             svgEmpty +
-            "<div style='display:flex;justify-content:space-between;font-size:10px;color:#666;'><span>0%</span><span>Текущий: " + chartsHistory.emptyStockShares[chartsHistory.emptyStockShares.length - 1].toFixed(1) + "%</span></div>" +
+            "<div style='display:flex;justify-content:space-between;font-size:10px;color:#666;'><span>0%</span><span>Current: " + chartsHistory.emptyStockShares[chartsHistory.emptyStockShares.length - 1].toFixed(1) + "%</span></div>" +
         "</div>" +
         "<div style='flex:1; display:flex; flex-direction:column;'>" +
-            "<div style='font-size:11px;font-weight:bold;color:#aaa;'>💰 СРЕДНЯЯ ПРИБЫЛЬ МАРШРУТОВ (<span style='color:#f1c40f'>руб. / рейс</span>)</div>" +
+            "<div style='font-size:11px;font-weight:bold;color:#aaa;'>💰 AVERAGE ROUTE PROFIT (<span style='color:#f1c40f'>units / trip</span>)</div>" +
             svgProfits +
-            "<div style='display:flex;justify-content:space-between;font-size:10px;color:#666;'><span>Мин: " + minPr.toFixed(0) + " р.</span><span>Макс: " + maxPr.toFixed(0) + " р.</span></div>" +
+            "<div style='display:flex;justify-content:space-between;font-size:10px;color:#666;'><span>Min: " + minPr.toFixed(0) + " u.</span><span>Max: " + maxPr.toFixed(0) + " u.</span></div>" +
         "</div>";
 }
