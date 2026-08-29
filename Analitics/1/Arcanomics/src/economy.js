@@ -6,25 +6,25 @@ function updateCityEconomy(id, data, exactTimeString) {
         var baseProductVolume = 0;
         var weatherModifiers = EventSystem.getModifiers(data.localEventObject, pName);
 
-        if (data.specializationText.includes("Торговый Хаб")) {
-            if (pName === "Хлеб") baseProductVolume = 0.25;
-            if (pName === "Дерево") baseProductVolume = 0.20;
-            if (pName === "Камень") baseProductVolume = 0.00;
-        } else if (data.specializationText.includes("Агрокомплекс")) {
-            if (pName === "Хлеб") baseProductVolume = 0.40;
+        if (data.specializationText.includes("Trade Hub")) {
+            if (pName === "Commodity A") baseProductVolume = 0.25;
+            if (pName === "Commodity B") baseProductVolume = 0.20;
+            if (pName === "Commodity C") baseProductVolume = 0.00;
+        } else if (data.specializationText.includes("Agri")) {
+            if (pName === "Commodity A") baseProductVolume = 0.40;
             else baseProductVolume = 0.02;
-        } else if (data.specializationText.includes("Промышленность")) {
-            if (pName === "Дерево") baseProductVolume = 0.35;
+        } else if (data.specializationText.includes("Industry")) {
+            if (pName === "Commodity B") baseProductVolume = 0.35;
             else baseProductVolume = 0.02;
-        } else if (data.specializationText.includes("Горнодобыча")) {
-            if (pName === "Камень") baseProductVolume = 0.30;
+        } else if (data.specializationText.includes("Extraction")) {
+            if (pName === "Commodity C") baseProductVolume = 0.30;
             else baseProductVolume = 0.02;
         } else {
             baseProductVolume = 0.05;
         }
 
         baseProductVolume *= weatherModifiers.productionMultiplier;
-        var baseBuyVolume = (data.specializationText.includes("Торговый Хаб") && pName === "Камень") ? 0.32 : 0.16;
+        var baseBuyVolume = (data.specializationText.includes("Trade Hub") && pName === "Commodity C") ? 0.32 : 0.16;
 
         item.stock += baseProductVolume;
         item.stock -= baseBuyVolume;
