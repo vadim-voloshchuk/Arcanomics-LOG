@@ -1,131 +1,252 @@
 [
   {
-    "u": "Ростов-на-Дону",
-    "v": "Аксай",
+    "u": "Region A · Hub 1",
+    "v": "Region A · Hub 2",
     "routes": [
       {
-        "name": "Трасса Ростов-на-Дону ↔ Аксай",
-        "dist": 12.5,
+        "name": "Route Region A · Hub 1 ↔ Region A · Hub 2",
+        "dist": 4.4,
         "speed": 90
       }
     ]
   },
   {
-    "u": "Ростов-на-Дону",
-    "v": "Азов",
+    "u": "Region A · Hub 1",
+    "v": "Region A · Hub 4",
     "routes": [
       {
-        "name": "Трасса Ростов-на-Дону ↔ Азов",
-        "dist": 25.0,
+        "name": "Route Region A · Hub 1 ↔ Region A · Hub 4",
+        "dist": 4.5,
         "speed": 90
       }
     ]
   },
   {
-    "u": "Аксай",
-    "v": "Азов",
+    "u": "Region A · Hub 2",
+    "v": "Region A · Hub 3",
     "routes": [
       {
-        "name": "Трасса Аксай ↔ Азов",
-        "dist": 37.2,
+        "name": "Route Region A · Hub 2 ↔ Region A · Hub 3",
+        "dist": 4.5,
         "speed": 90
       }
     ]
   },
   {
-    "u": "Таганрог",
-    "v": "Неклиновский район",
+    "u": "Region A · Hub 3",
+    "v": "Region A · Hub 4",
     "routes": [
       {
-        "name": "Трасса Таганрог ↔ Неклиновский район",
-        "dist": 29.6,
+        "name": "Route Region A · Hub 3 ↔ Region A · Hub 4",
+        "dist": 4.4,
         "speed": 90
       }
     ]
   },
   {
-    "u": "Таганрог",
-    "v": "Азов",
+    "u": "Region B · Hub 1",
+    "v": "Region B · Hub 2",
     "routes": [
       {
-        "name": "Трасса Таганрог ↔ Азов",
-        "dist": 42.2,
+        "name": "Route Region B · Hub 1 ↔ Region B · Hub 2",
+        "dist": 235.8,
         "speed": 90
       }
     ]
   },
   {
-    "u": "Неклиновский район",
-    "v": "Азов",
+    "u": "Region B · Hub 1",
+    "v": "Region B · Hub 4",
     "routes": [
       {
-        "name": "Трасса Неклиновский район ↔ Азов",
-        "dist": 70.3,
+        "name": "Route Region B · Hub 1 ↔ Region B · Hub 4",
+        "dist": 305.0,
         "speed": 90
       }
     ]
   },
   {
-    "u": "Мюнхен",
-    "v": "Аугсбург",
+    "u": "Region B · Hub 2",
+    "v": "Region B · Hub 4",
     "routes": [
       {
-        "name": "Трасса Мюнхен ↔ Аугсбург",
+        "name": "Route Region B · Hub 2 ↔ Region B · Hub 4",
+        "dist": 118.1,
+        "speed": 90
+      }
+    ]
+  },
+  {
+    "u": "Region B · Hub 3",
+    "v": "Region B · Hub 2",
+    "routes": [
+      {
+        "name": "Route Region B · Hub 3 ↔ Region B · Hub 2",
+        "dist": 293.3,
+        "speed": 90
+      }
+    ]
+  },
+  {
+    "u": "Region B · Hub 3",
+    "v": "Region B · Hub 1",
+    "routes": [
+      {
+        "name": "Route Region B · Hub 3 ↔ Region B · Hub 1",
+        "dist": 361.2,
+        "speed": 90
+      }
+    ]
+  },
+  {
+    "u": "Region C · Hub 1",
+    "v": "Region C · Hub 3",
+    "routes": [
+      {
+        "name": "Route Region C · Hub 1 ↔ Region C · Hub 3",
         "dist": 57.6,
         "speed": 90
       }
     ]
   },
   {
-    "u": "Мюнхен",
-    "v": "Регенсбург",
+    "u": "Region C · Hub 1",
+    "v": "Region C · Hub 4",
     "routes": [
       {
-        "name": "Трасса Мюнхен ↔ Регенсбург",
+        "name": "Route Region C · Hub 1 ↔ Region C · Hub 4",
         "dist": 105.1,
         "speed": 90
       }
     ]
   },
   {
-    "u": "Нюрнберг",
-    "v": "Регенсбург",
+    "u": "Region C · Hub 2",
+    "v": "Region C · Hub 4",
     "routes": [
       {
-        "name": "Трасса Нюрнберг ↔ Регенсбург",
+        "name": "Route Region C · Hub 2 ↔ Region C · Hub 4",
         "dist": 89.4,
         "speed": 90
       }
     ]
   },
   {
-    "u": "Нюрнберг",
-    "v": "Аугсбург",
+    "u": "Region C · Hub 2",
+    "v": "Region C · Hub 3",
     "routes": [
       {
-        "name": "Трасса Нюрнберг ↔ Аугсбург",
+        "name": "Route Region C · Hub 2 ↔ Region C · Hub 3",
         "dist": 120.8,
         "speed": 90
       }
     ]
   },
   {
-    "u": "Аугсбург",
-    "v": "Регенсбург",
+    "u": "Region C · Hub 3",
+    "v": "Region C · Hub 4",
     "routes": [
       {
-        "name": "Трасса Аугсбург ↔ Регенсбург",
+        "name": "Route Region C · Hub 3 ↔ Region C · Hub 4",
         "dist": 113.8,
         "speed": 90
       }
     ]
   },
   {
-    "u": "Ростов-на-Дону",
-    "v": "Мюнхен",
+    "u": "Region D · Hub 1",
+    "v": "Region D · Hub 2",
     "routes": [
       {
-        "name": "Трансконтинентальный Коридор Ростов-на-Дону ↔ Мюнхен",
+        "name": "Route Region D · Hub 1 ↔ Region D · Hub 2",
+        "dist": 12.5,
+        "speed": 90
+      }
+    ]
+  },
+  {
+    "u": "Region D · Hub 1",
+    "v": "Region D · Hub 5",
+    "routes": [
+      {
+        "name": "Route Region D · Hub 1 ↔ Region D · Hub 5",
+        "dist": 25.0,
+        "speed": 90
+      }
+    ]
+  },
+  {
+    "u": "Region D · Hub 2",
+    "v": "Region D · Hub 5",
+    "routes": [
+      {
+        "name": "Route Region D · Hub 2 ↔ Region D · Hub 5",
+        "dist": 37.2,
+        "speed": 90
+      }
+    ]
+  },
+  {
+    "u": "Region D · Hub 3",
+    "v": "Region D · Hub 4",
+    "routes": [
+      {
+        "name": "Route Region D · Hub 3 ↔ Region D · Hub 4",
+        "dist": 29.6,
+        "speed": 90
+      }
+    ]
+  },
+  {
+    "u": "Region D · Hub 3",
+    "v": "Region D · Hub 5",
+    "routes": [
+      {
+        "name": "Route Region D · Hub 3 ↔ Region D · Hub 5",
+        "dist": 42.2,
+        "speed": 90
+      }
+    ]
+  },
+  {
+    "u": "Region D · Hub 4",
+    "v": "Region D · Hub 5",
+    "routes": [
+      {
+        "name": "Route Region D · Hub 4 ↔ Region D · Hub 5",
+        "dist": 70.3,
+        "speed": 90
+      }
+    ]
+  },
+  {
+    "u": "Region A · Hub 1",
+    "v": "Region B · Hub 1",
+    "routes": [
+      {
+        "name": "Regional corridor Region A · Hub 1 ↔ Region B · Hub 1",
+        "dist": 160.0,
+        "speed": 120
+      }
+    ]
+  },
+  {
+    "u": "Region B · Hub 1",
+    "v": "Region C · Hub 1",
+    "routes": [
+      {
+        "name": "Regional corridor Region B · Hub 1 ↔ Region C · Hub 1",
+        "dist": 160.0,
+        "speed": 120
+      }
+    ]
+  },
+  {
+    "u": "Region C · Hub 1",
+    "v": "Region D · Hub 1",
+    "routes": [
+      {
+        "name": "Regional corridor Region C · Hub 1 ↔ Region D · Hub 1",
         "dist": 160.0,
         "speed": 120
       }
