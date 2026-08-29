@@ -30,28 +30,28 @@ function initializeCitySimulations() {
         var specialization;
 
         if (rnd < 0.35) {
-            specialization = "Агрокомплекс (Выпуск: Хлеб)";
+            specialization = "Agri-cluster (Output: Commodity A)";
         } else if (rnd < 0.60) {
-            specialization = "Промышленность (Выпуск: Дерево)";
+            specialization = "Industry (Output: Commodity B)";
         } else if (rnd < 0.80) {
-            specialization = "Горнодобыча (Выпуск: Камень)";
+            specialization = "Extraction (Output: Commodity C)";
         } else {
-            specialization = "Торговый Хаб (Выпуск: Высокие технологии | Спрос на сырье)";
+            specialization = "Trade Hub (Output: High-value goods | Demand for raw materials)";
         }
 
-        if (specialization.includes("Хлеб")) {
-            cityProducts["Хлеб"].stock = 120; 
-            cityProducts["Хлеб"].base_price = 25; 
-        } else if (specialization.includes("Дерево")) {
-            cityProducts["Дерево"].stock = 120;
-            cityProducts["Дерево"].base_price = 20;
-        } else if (specialization.includes("Камень")) {
-            cityProducts["Камень"].stock = 120;
-            cityProducts["Камень"].base_price = 15;
-        } else if (specialization.includes("Торговый Хаб")) {
-            cityProducts["Хлеб"].stock = 20;  cityProducts["Хлеб"].base_price = 55;
-            cityProducts["Дерево"].stock = 20; cityProducts["Дерево"].base_price = 45;
-            cityProducts["Камень"].stock = 20; cityProducts["Камень"].base_price = 35;
+        if (specialization.includes("Commodity A")) {
+            cityProducts["Commodity A"].stock = 120; 
+            cityProducts["Commodity A"].base_price = 25; 
+        } else if (specialization.includes("Commodity B")) {
+            cityProducts["Commodity B"].stock = 120;
+            cityProducts["Commodity B"].base_price = 20;
+        } else if (specialization.includes("Commodity C")) {
+            cityProducts["Commodity C"].stock = 120;
+            cityProducts["Commodity C"].base_price = 15;
+        } else if (specialization.includes("Trade Hub")) {
+            cityProducts["Commodity A"].stock = 20;  cityProducts["Commodity A"].base_price = 55;
+            cityProducts["Commodity B"].stock = 20; cityProducts["Commodity B"].base_price = 45;
+            cityProducts["Commodity C"].stock = 20; cityProducts["Commodity C"].base_price = 35;
         }
 
         citySimulations[id] = {
