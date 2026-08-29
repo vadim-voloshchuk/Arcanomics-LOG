@@ -1,28 +1,28 @@
 {
-  "rostov": [
-    {"name": "Ростов-на-Дону", "lat": 47.23, "lon": 39.70, "population": 1140000},
-    {"name": "Аксай", "lat": 47.26, "lon": 39.86, "population": 46000},
-    {"name": "Таганрог", "lat": 47.23, "lon": 38.89, "population": 250000},
-    {"name": "Неклиновский район", "lat": 47.20, "lon": 38.50, "population": 80000},
-    {"name": "Азов", "lat": 47.11, "lon": 39.42, "population": 80000},
-    {"name": "Азовский район", "lat": 47.05, "lon": 39.60, "population": 90000}
+  "region_d": [
+    {"name": "Region D · Hub 1", "lat": 47.23, "lon": 39.70, "population": 1140000},
+    {"name": "Region D · Hub 2", "lat": 47.26, "lon": 39.86, "population": 46000},
+    {"name": "Region D · Hub 3", "lat": 47.23, "lon": 38.89, "population": 250000},
+    {"name": "Region D · Hub 4", "lat": 47.20, "lon": 38.50, "population": 80000},
+    {"name": "Region D · Hub 5", "lat": 47.11, "lon": 39.42, "population": 80000},
+    {"name": "Region D · Hub 6", "lat": 47.05, "lon": 39.60, "population": 90000}
   ],
-  "texas": [
-    {"name": "Хьюстон", "lat": 29.76, "lon": -95.36, "population": 2300000},
-    {"name": "Остин", "lat": 30.26, "lon": -97.74, "population": 960000},
-    {"name": "Даллас", "lat": 32.77, "lon": -96.79, "population": 1300000},
-    {"name": "Сан-Антонио", "lat": 29.42, "lon": -98.49, "population": 1400000}
+  "region_b": [
+    {"name": "Region B · Hub 1", "lat": 29.76, "lon": -95.36, "population": 2300000},
+    {"name": "Region B · Hub 2", "lat": 30.26, "lon": -97.74, "population": 960000},
+    {"name": "Region B · Hub 3", "lat": 32.77, "lon": -96.79, "population": 1300000},
+    {"name": "Region B · Hub 4", "lat": 29.42, "lon": -98.49, "population": 1400000}
   ],
-  "tokyo": [
-    {"name": "Синдзюку", "lat": 35.69, "lon": 139.70, "population": 350000},
-    {"name": "Сибуя", "lat": 35.65, "lon": 139.70, "population": 230000},
-    {"name": "Минато", "lat": 35.65, "lon": 139.75, "population": 260000},
-    {"name": "Тиёда", "lat": 35.69, "lon": 139.75, "population": 66000}
+  "region_a": [
+    {"name": "Region A · Hub 1", "lat": 35.69, "lon": 139.70, "population": 350000},
+    {"name": "Region A · Hub 2", "lat": 35.65, "lon": 139.70, "population": 230000},
+    {"name": "Region A · Hub 3", "lat": 35.65, "lon": 139.75, "population": 260000},
+    {"name": "Region A · Hub 4", "lat": 35.69, "lon": 139.75, "population": 66000}
   ],
-  "bavaria": [
-    {"name": "Мюнхен", "lat": 48.13, "lon": 11.58, "population": 1470000},
-    {"name": "Нюрнберг", "lat": 49.45, "lon": 11.07, "population": 515000},
-    {"name": "Аугсбург", "lat": 48.37, "lon": 10.89, "population": 295000},
-    {"name": "Регенсбург", "lat": 49.01, "lon": 12.10, "population": 150000}
+  "region_c": [
+    {"name": "Region C · Hub 1", "lat": 48.13, "lon": 11.58, "population": 1470000},
+    {"name": "Region C · Hub 2", "lat": 49.45, "lon": 11.07, "population": 515000},
+    {"name": "Region C · Hub 3", "lat": 48.37, "lon": 10.89, "population": 295000},
+    {"name": "Region C · Hub 4", "lat": 49.01, "lon": 12.10, "population": 150000}
   ]
 }
