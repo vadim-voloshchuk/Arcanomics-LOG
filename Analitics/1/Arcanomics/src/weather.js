@@ -8,12 +8,12 @@ var EventSystem = {
     eventHistory: [],
 
     definitions: [
-        { key: "drought", name: "Засуха", logName: "Drought", minDays: 3, maxDays: 4, resource: "Хлеб", productionMultiplier: 0.65, priceMultiplier: 1.20 },
+        { key: "drought", name: "Засуха", logName: "Drought", minDays: 3, maxDays: 4, resource: "Commodity A", productionMultiplier: 0.65, priceMultiplier: 1.20 },
         { key: "downpour", name: "Ливень", logName: "Downpour", minDays: 2, maxDays: 3, transportMultiplier: 0.80, transportCostMultiplier: 1.10 },
-        { key: "frost", name: "Заморозки", logName: "Frost", minDays: 2, maxDays: 3, resource: "Хлеб", productionMultiplier: 0.70 },
+        { key: "frost", name: "Заморозки", logName: "Frost", minDays: 2, maxDays: 3, resource: "Commodity A", productionMultiplier: 0.70 },
         { key: "storm", name: "Шторм", logName: "Storm", minDays: 1, maxDays: 2, transportMultiplier: 0.60 },
         { key: "fog", name: "Туман", logName: "Fog", minDays: 1, maxDays: 2, transportMultiplier: 0.85 },
-        { key: "harvest", name: "Урожайный сезон", logName: "Harvest Season", minDays: 3, maxDays: 4, resource: "Хлеб", productionMultiplier: 1.25 },
+        { key: "harvest", name: "Урожайный сезон", logName: "Harvest Season", minDays: 3, maxDays: 4, resource: "Commodity A", productionMultiplier: 1.25 },
         { key: "fire", name: "Пожар на производстве", logName: "Production Fire", minDays: 1, maxDays: 2, productionMultiplier: 0.50 }
     ],
 
@@ -130,23 +130,22 @@ var EventSystem = {
         var rainShift = 0;
         var windShift = 0;
 
-        // Климатические зоны (оставляем без изменений)
-        if (nameLower.includes("хьюстон") || nameLower.includes("остин") || nameLower.includes("даллас") || nameLower.includes("сан-антонио") || nameLower.includes("texas")) {
-            tempShift = 7.5;   
+        var cityHash = 0;
+        for (var i = 0; i < cityName.length; i++) {
+            cityHash += cityName.charCodeAt(i);
+        }
+        var climateProfile = cityHash % 3;
+        if (climateProfile === 0) {
+            tempShift = 7.5;
             rainShift = 0.1;
-        } else if (nameLower.includes("синдзюку") || nameLower.includes("сибуя") || nameLower.includes("минато") || nameLower.includes("тиёда") || nameLower.includes("tokyo")) {
-            tempShift = 3.0;   
-            windShift = 4.0;   
-        } else if (nameLower.includes("мюнхен") || nameLower.includes("нюрнберг") || nameLower.includes("аугсбург") || nameLower.includes("регенсбург") || nameLower.includes("bavaria")) {
-            tempShift = -4.0;  
+        } else if (climateProfile === 1) {
+            tempShift = 3.0;
+            windShift = 4.0;
         } else {
-            tempShift = 1.0;   
+            tempShift = -4.0;
         }
 
-        var localHourShift = 0;
-        if (nameLower.includes("tokyo")) localHourShift = 6;      
-        else if (nameLower.includes("bavaria")) localHourShift = -2; 
-        else if (nameLower.includes("texas")) localHourShift = -9;   
+        var localHourShift = (cityHash % 9) - 4;
 
         // ЗАМЕНИТЕ ИСПОЛЬЗОВАНИЕ gameHour НА ПРИШЕДШИЙ ПАРАМЕТР currentHour:
         var localHour = (currentHour + localHourShift + 24) % 24;
