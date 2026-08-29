@@ -1,5 +1,5 @@
 {
-  "Хлеб": {"stock": 50, "base_price": 40, "last_price": 40, "current_price": 40},
-  "Дерево": {"stock": 60, "base_price": 30, "last_price": 30, "current_price": 30},
-  "Камень": {"stock": 70, "base_price": 20, "last_price": 20, "current_price": 20}
+  "Commodity A": {"stock": 50, "base_price": 40, "last_price": 40, "current_price": 40},
+  "Commodity B": {"stock": 60, "base_price": 30, "last_price": 30, "current_price": 30},
+  "Commodity C": {"stock": 70, "base_price": 20, "last_price": 20, "current_price": 20}
 }
