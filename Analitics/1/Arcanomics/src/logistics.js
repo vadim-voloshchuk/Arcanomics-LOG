@@ -22,10 +22,10 @@ function updateRoadLogistics() {
         var distance = mainRoute.dist;
         var baseTransportCost = distance * 0.5;
         var finalTransportCost = baseTransportCost * costModifier;
-        var activeTradeCargo = "Нет активных караванов";
+        var activeTradeCargo = "No active caravans";
         var isTradingNow = false;
         var currentTripProfit = 0;
-        var productNames = ["Хлеб", "Дерево", "Камень"];
+        var productNames = ["Commodity A", "Commodity B", "Commodity C"];
         var CARAVAN_VOLUME = 15;
 
         for (var i = 0; i < productNames.length; i++) {
@@ -43,7 +43,7 @@ function updateRoadLogistics() {
                     currentTripProfit = netProfit;
                     road.totalProfit += netProfit;
                     road.totalTrips++;
-                    activeTradeCargo = "Караван: " + road.v + " -> " + road.u + " [" + pName + " x" + CARAVAN_VOLUME + "]";
+                    activeTradeCargo = "Caravan: " + road.v + " -> " + road.u + " [" + pName + " x" + CARAVAN_VOLUME + "]";
                     break;
                 }
             } else if (priceInB > priceInA && cityA.products[pName].stock >= CARAVAN_VOLUME) {
@@ -56,7 +56,7 @@ function updateRoadLogistics() {
                     currentTripProfit = reverseNetProfit;
                     road.totalProfit += reverseNetProfit;
                     road.totalTrips++;
-                    activeTradeCargo = "Караван: " + road.u + " -> " + road.v + " [" + pName + " x" + CARAVAN_VOLUME + "]";
+                    activeTradeCargo = "Caravan: " + road.u + " -> " + road.v + " [" + pName + " x" + CARAVAN_VOLUME + "]";
                     break;
                 }
             }
@@ -75,16 +75,16 @@ function updateRoadLogistics() {
         if (isTradingNow) { roadColor = "#f1c40f"; roadWidth = 5; }
         else if (speedModifier < 1) { roadColor = "#3498db"; roadWidth = 3; }
 
-        var edgeTooltipText = "МАРШРУТ: " + road.u + " <-> " + road.v +
-            "\nПогодное событие: " + weatherNotice +
+        var edgeTooltipText = "ROUTE: " + road.u + " <-> " + road.v +
+            "\nWeather impact: " + weatherNotice +
             "\n-------------------------------------" +
-            "\n📊 СТАТИСТИКА ДОХОДНОСТИ:" +
-            "\n * Себестоимость рейса: " + finalTransportCost.toFixed(1) + " руб." +
-            "\n * Выручка текущего рейса: " + (isTradingNow ? currentTripProfit.toFixed(1) + " руб." : "0 руб.") +
-            "\n * СРЕДНЯЯ ЧИСТАЯ ПРИБЫЛЬ: " + avgProfit.toFixed(1) + " руб./рейс" +
-            "\n * Всего совершено рейсов: " + road.totalTrips +
+            "\n📊 PROFIT STATISTICS:" +
+            "\n * Route cost: " + finalTransportCost.toFixed(1) + " units" +
+            "\n * Current trip revenue: " + (isTradingNow ? currentTripProfit.toFixed(1) + " units" : "0 units") +
+            "\n * Average net profit: " + avgProfit.toFixed(1) + " units/trip" +
+            "\n * Total trips: " + road.totalTrips +
             "\n-------------------------------------" +
-            "\n🚚 ЛОГИСТИКА: " + activeTradeCargo + "\n";
+            "\n🚚 LOGISTICS: " + activeTradeCargo + "\n";
 
         road.routes.forEach(function(route, index) {
             var actualSpeed = route.speed * speedModifier;
@@ -92,15 +92,15 @@ function updateRoadLogistics() {
             var travelTimeHours = route.dist / actualSpeed;
             var hours = Math.floor(travelTimeHours);
             var minutes = Math.round((travelTimeHours - hours) * 60);
-            edgeTooltipText += "\nВариант " + (index + 1) + ": " + route.name +
-                "\nДлина: " + route.dist + " км" +
-                "\nВремя в пути: " + (hours > 0 ? hours + " ч. " : "") + minutes + " мин. (" + Math.round(actualSpeed) + " км/ч)\n";
+            edgeTooltipText += "\nOption " + (index + 1) + ": " + route.name +
+                "\nLength: " + route.dist + " km" +
+                "\nJourney time: " + (hours > 0 ? hours + " h " : "") + minutes + " min (" + Math.round(actualSpeed) + " km/h)\n";
         });
 
         if (typeof network !== "undefined") network.redraw();
         edges.update({
-            id: road.id, label: mainRoute.dist + " км", title: edgeTooltipText, width: roadWidth,
-            arrows: { to: { enabled: true, scaleFactor: isTradingNow ? 0.9 : 0.4 } },
+            id: road.id, label: mainRoute.dist + " km", title: edgeTooltipText, width: roadWidth,
+            arrows: { to: { enabled: false } },
             color: { color: roadColor, hover: "#ffffff", highlight: "#ff4d4d" }
         });
     });
