@@ -27,12 +27,25 @@ var EventSystem = {
         this.eventHistory = [];
     },
 
+    // ПРИМЕЧАНИЕ: эта функция используется ТОЛЬКО для глобальной сводной
+    // статистики (this.currentEvent, weather_events.csv, simulation_log.csv).
+    // Экономика и логистика городов используют EventSystem.getCityWeatherState(),
+    // а не this.currentEvent.
     advanceToDay: function(day) {
-        // Защита: если база данных погоды вообще не массив или пуста, создаем её
-        if (!window.weatherHistoryDB || !Array.isArray(weatherHistoryDB) || weatherHistoryDB.length === 0) {
-            weatherHistoryDB = [];
+        // weatherHistoryDB — объект по регионам: { region_a: [...], region_b: [...], ... }
+        // Для глобальной сводной статистики берём первый доступный регион как опорный ряд.
+        var globalWeatherArray = null;
+        if (window.weatherHistoryDB && !Array.isArray(weatherHistoryDB) && typeof weatherHistoryDB === "object") {
+            var firstRegionKey = Object.keys(weatherHistoryDB)[0];
+            globalWeatherArray = firstRegionKey ? weatherHistoryDB[firstRegionKey] : null;
+        } else if (Array.isArray(weatherHistoryDB)) {
+            globalWeatherArray = weatherHistoryDB;
+        }
+
+        if (!globalWeatherArray || globalWeatherArray.length === 0) {
+            globalWeatherArray = [];
             for (var i = 0; i < 5000; i++) {
-                weatherHistoryDB.push({
+                globalWeatherArray.push({
                     temp: 15.0 + (Math.sin(i / 12) * 5),
                     rain: i % 48 === 0 ? 0.6 : 0.0,
                     snow: 0.0,
@@ -42,18 +55,16 @@ var EventSystem = {
         }
 
         var currentGlobalHour = ((day - 1) * 24) + gameHour;
-        
-        // Циклическая защита от выхода за границы массива
-        if (currentGlobalHour >= weatherHistoryDB.length) {
-            currentGlobalHour = currentGlobalHour % weatherHistoryDB.length;
+
+        if (currentGlobalHour >= globalWeatherArray.length) {
+            currentGlobalHour = currentGlobalHour % globalWeatherArray.length;
         }
         if (currentGlobalHour < 0) {
             currentGlobalHour = 0;
         }
-        
-        var record = weatherHistoryDB[currentGlobalHour];
-        
-        // Главная защита от ошибки на скриншоте: если элемент массива почему-то undefined
+
+        var record = globalWeatherArray[currentGlobalHour];
+
         if (!record || typeof record.temp === "undefined") {
             record = {
                 temp: 15.0 + (Math.sin(currentGlobalHour / 12) * 5),
@@ -95,7 +106,7 @@ var EventSystem = {
             document.getElementById("w-rain").innerText = rain.toFixed(1) + " мм";
             document.getElementById("w-snow").innerText = snow.toFixed(1) + " см";
             document.getElementById("w-wind").innerText = Math.round(wind) + " км/ч";
-            
+
             var statusCell = document.getElementById("w-status");
             statusCell.innerText = this.currentEvent.name;
             if (this.currentEvent.key === "harvest") {
@@ -106,11 +117,13 @@ var EventSystem = {
         }
     },
 
-    // МЕНЯЕМ И ДОПИСЫВАЕМ СТРОГО ОТ СЛОВА getModifiers ДО КОНЦА ОБЪЕКТА EventSystem:
-    getModifiers: function(productName) {
+    // Извлекает из готового погодного объекта множители, влияющие на производство,
+    // цену и транспорт. weatherObject - это ОБЪЕКТ КОНКРЕТНОГО ГОРОДА
+    // (результат getCityWeatherState), а не глобальное this.currentEvent.
+    getModifiers: function(weatherObject, productName) {
         var modifiers = { productionMultiplier: 1, transportMultiplier: 1, transportCostMultiplier: 1, priceMultiplier: 1 };
-        if (!this.currentEvent) return modifiers;
-        var event = this.currentEvent;
+        if (!weatherObject) return modifiers;
+        var event = weatherObject;
         if (!event.affectedResource || typeof productName === "undefined" || productName === event.affectedResource) {
             modifiers.productionMultiplier = event.productionMultiplier;
             modifiers.priceMultiplier = event.priceMultiplier;
@@ -120,12 +133,35 @@ var EventSystem = {
         return modifiers;
     },
 
-    // НОВЫЙ МЕТОД: Генерирует уникальную локальную погоду для города без изменения глобального состояния
-    // НАЙДИТЕ СТРОКУ 41 И ЗАМЕНИТЕ НАЧАЛО МЕТОДА НА ЭТО:
-    getCityLocalWeather: function(cityName, baseRecord, currentDay, currentHour) { // <-- Передали время сюда
-        if (!baseRecord) return { name: "Ясно", temp: 15, rain: 0, snow: 0, wind: 10 };
-        
-        var nameLower = cityName.toLowerCase();
+    // ЕДИНЫЙ метод получения погодного состояния города.
+    // Инкапсулирует: поиск региона города -> выборку записи CSV этого региона ->
+    // расчёт уникальной локальной погоды и коэффициентов влияния на
+    // производство/транспорт/цену. Это единственное место в проекте, которое
+    // должно вызываться, чтобы узнать погоду конкретного города —
+    // simulation.js, дашборд и любой будущий код используют только его.
+    getCityWeatherState: function(cityId, currentDay, currentHour) {
+        var cityNode = typeof nodes !== "undefined" ? nodes.get(cityId) : null;
+        var cityRegion = (cityNode && cityNode.region) ? cityNode.region : null;
+
+        var regionWeatherArray = (cityRegion && window.weatherHistoryDB && weatherHistoryDB[cityRegion])
+            ? weatherHistoryDB[cityRegion]
+            : null;
+
+        var baseRecord = null;
+        if (regionWeatherArray && regionWeatherArray.length > 0) {
+            var currentGlobalHour = (((currentDay - 1) * 24) + currentHour) % regionWeatherArray.length;
+            baseRecord = regionWeatherArray[currentGlobalHour];
+        }
+
+        return this.getCityLocalWeather(cityId, baseRecord, currentDay, currentHour);
+    },
+
+    // Генерирует уникальную локальную погоду для города по базовой записи его региона.
+    // Вызывается ТОЛЬКО из getCityWeatherState — напрямую извне лучше не дёргать,
+    // чтобы не дублировать логику поиска региона/записи в разных местах проекта.
+    getCityLocalWeather: function(cityName, baseRecord, currentDay, currentHour) {
+        if (!baseRecord) return { name: "Ясно", temp: 15, rain: 0, snow: 0, wind: 10, productionMultiplier: 1, transportMultiplier: 1, transportCostMultiplier: 1, priceMultiplier: 1 };
+
         var tempShift = 0;
         var rainShift = 0;
         var windShift = 0;
@@ -146,27 +182,16 @@ var EventSystem = {
         }
 
         var localHourShift = (cityHash % 9) - 4;
-
-        // ЗАМЕНИТЕ ИСПОЛЬЗОВАНИЕ gameHour НА ПРИШЕДШИЙ ПАРАМЕТР currentHour:
         var localHour = (currentHour + localHourShift + 24) % 24;
-        var dailyCycle = Math.sin(((localHour - 6) / 24) * Math.PI * 2) * 6; 
+        var dailyCycle = Math.sin(((localHour - 6) / 24) * Math.PI * 2) * 6;
 
-        // АКУРАТНО ДОБАВЛЯЕМ: Процедурный хэш имени города для создания уникального шума погоды
-        var cityHash = 0;
-        for (var i = 0; i < cityName.length; i++) {
-            cityHash += cityName.charCodeAt(i);
-        }
-        // Уникальный сдвиг температуры для каждого города (в пределах +/- 3.5°C)
-        var cityNoise = Math.sin(cityHash) * 8.5; 
-        // Небольшой уникальный сдвиг осадков и ветра для рассинхронизации штормов
+        var cityNoise = Math.sin(cityHash) * 8.5;
         var weatherNoise = Math.cos(cityHash) * 0.9;
 
-        // Применяем индивидуальный шум к расчету метеоусловий
         var finalTemp = baseRecord.temp + tempShift + dailyCycle + cityNoise;
         var finalRain = Math.max(0, baseRecord.rain + rainShift + (weatherNoise > 0 ? weatherNoise : 0));
         var finalWind = Math.max(0, baseRecord.wind + windShift + (cityNoise * 2));
         var finalSnow = baseRecord.snow;
-
 
         if (typeof this.cityCooldowns === "undefined") {
             this.cityCooldowns = {};
@@ -188,19 +213,18 @@ var EventSystem = {
 
         var finalStatusKey = baseStatusKey;
 
-        // ЗАМЕНИТЕ ИСПОЛЬЗОВАНИЕ gameDay НА ПРИШЕДШИЙ ПАРАМЕТР currentDay:
         if (currentDay < cityCooldown.cooldownEndDay) {
             if (baseStatusKey !== "harvest") {
                 finalStatusKey = "harvest";
-                finalRain = 0; 
+                finalRain = 0;
                 finalWind = 10;
             }
         } else {
             if (baseStatusKey !== "harvest" && cityCooldown.lastActiveEventKey === "harvest") {
-                cityCooldown.cooldownEndDay = currentDay + 2; 
+                cityCooldown.cooldownEndDay = currentDay + 2;
             }
         }
-        
+
         cityCooldown.lastActiveEventKey = baseStatusKey;
 
         var statusName = "Ясно";
@@ -220,7 +244,6 @@ var EventSystem = {
             prodMult = 0.70; transMult = 1.00; costMult = 1.00; priceMult = 1.20;
         }
 
-        // ЗАМЕНИТЕ ИСПОЛЬЗОВАНИЕ gameDay НА ПРИШЕДШИЙ ПАРАМЕТР currentDay:
         var displayName = statusName;
         if (currentDay < cityCooldown.cooldownEndDay && baseStatusKey !== "harvest") {
             displayName = "Затишье (После непогоды)";
@@ -239,7 +262,6 @@ var EventSystem = {
             priceMultiplier: priceMult
         };
     },
-
 
     getEventName: function() {
         return this.currentEvent ? this.currentEvent.name : "Нет";
