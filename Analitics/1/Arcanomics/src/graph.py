@@ -1,3 +1,5 @@
+"""Build the dynamic, fully connected city and road map with isolated regions."""
+
 import json
 import math
 from pathlib import Path
