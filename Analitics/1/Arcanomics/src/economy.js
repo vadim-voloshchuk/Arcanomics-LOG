@@ -1,84 +1,151 @@
 // Production, stocks, demand and prices for a single city.
+//
+// ЕДИНИЦЫ ИЗМЕРЕНИЯ: эта функция вызывается РОВНО ОДИН РАЗ за игровой час
+// (см. runSimulationHour в simulation.js), поэтому все объёмы ниже -
+// production_per_hour, demand_per_hour, fulfilled_demand, unmet_demand -
+// выражены в "единицах товара за игровой час" и напрямую, без скрытых
+// умножений, применяются к складским остаткам (тоже в единицах товара).
+
+// Три модели ценообразования вынесены в отдельные функции с явно заданными
+// параметрами - вместо коэффициентов, разбросанных внутри updateCityEconomy.
+var PricingModels = {
+    market: function(p) {
+        var ratio = p.supply === 0 ? p.ratioMax : p.demand / p.supply;
+        ratio = Math.max(p.ratioMin, Math.min(ratio, p.ratioMax));
+        return p.basePrice * ratio;
+    },
+    linear: function(p) {
+        var price = p.basePrice + (p.demand - p.production) * p.demandCoefficient - p.stock * p.stockCoefficient;
+        return Math.max(p.basePrice * p.priceFloorRatio, Math.min(price, p.priceCeiling));
+    },
+    inertia: function(p) {
+        var price = p.lastPrice + (p.demand - p.production) * p.demandCoefficient - p.stock * p.stockCoefficient;
+        return Math.max(p.basePrice * p.priceFloorRatio, Math.min(price, p.priceCeiling));
+    }
+};
+
+var PRICING_PARAMS = {
+    market: { ratioMin: 0.3, ratioMax: 3.5 },
+    linear: { demandCoefficient: 1.5, stockCoefficient: 0.2, priceFloorRatio: 0.4, priceCeiling: 120 },
+    inertia: { demandCoefficient: 0.8, stockCoefficient: 0.1, priceFloorRatio: 0.4, priceCeiling: 120 }
+};
+
+function computeCurrentPrice(item, demandPerHour, productionPerHour, availableForSale, postSaleStock) {
+    var modelName = ExperimentConfig.model;
+    var modelFn = PricingModels[modelName];
+    if (!modelFn) {
+        throw new Error("Unknown ExperimentConfig.model: " + modelName);
+    }
+
+    var params;
+    if (modelName === "market") {
+        params = {
+            basePrice: item.base_price,
+            demand: demandPerHour,
+            supply: availableForSale, // то, что реально можно было продать в этот час
+            ratioMin: PRICING_PARAMS.market.ratioMin,
+            ratioMax: PRICING_PARAMS.market.ratioMax
+        };
+    } else if (modelName === "linear") {
+        params = {
+            basePrice: item.base_price,
+            demand: demandPerHour,
+            production: productionPerHour,
+            stock: postSaleStock,
+            demandCoefficient: PRICING_PARAMS.linear.demandCoefficient,
+            stockCoefficient: PRICING_PARAMS.linear.stockCoefficient,
+            priceFloorRatio: PRICING_PARAMS.linear.priceFloorRatio,
+            priceCeiling: PRICING_PARAMS.linear.priceCeiling
+        };
+    } else { // inertia
+        params = {
+            basePrice: item.base_price,
+            lastPrice: item.last_price,
+            demand: demandPerHour,
+            production: productionPerHour,
+            stock: postSaleStock,
+            demandCoefficient: PRICING_PARAMS.inertia.demandCoefficient,
+            stockCoefficient: PRICING_PARAMS.inertia.stockCoefficient,
+            priceFloorRatio: PRICING_PARAMS.inertia.priceFloorRatio,
+            priceCeiling: PRICING_PARAMS.inertia.priceCeiling
+        };
+    }
+
+    return modelFn(params);
+}
+
 function updateCityEconomy(id, data, exactTimeString) {
     var goodsText = "";
     for (var pName in data.products) {
         var item = data.products[pName];
-        var baseProductVolume = 0;
-        var weatherModifiers = EventSystem.getModifiers(data.localEventObject, pName);
+        var weatherModifiers = EventSystem.getModifiers(data.localWeatherObject, pName);
 
+        // Базовая производительность города по товару, УЖЕ в единицах товара за игровой час.
+        var baseProductionPerHour = 0;
         if (data.specializationText.includes("Trade Hub")) {
-            if (pName === "Commodity A") baseProductVolume = 0.25;
-            if (pName === "Commodity B") baseProductVolume = 0.20;
-            if (pName === "Commodity C") baseProductVolume = 0.00;
+            if (pName === "Commodity A") baseProductionPerHour = 15;
+            if (pName === "Commodity B") baseProductionPerHour = 12;
+            if (pName === "Commodity C") baseProductionPerHour = 0;
         } else if (data.specializationText.includes("Agri")) {
-            if (pName === "Commodity A") baseProductVolume = 0.40;
-            else baseProductVolume = 0.02;
+            baseProductionPerHour = (pName === "Commodity A") ? 24 : 1.2;
         } else if (data.specializationText.includes("Industry")) {
-            if (pName === "Commodity B") baseProductVolume = 0.35;
-            else baseProductVolume = 0.02;
+            baseProductionPerHour = (pName === "Commodity B") ? 21 : 1.2;
         } else if (data.specializationText.includes("Extraction")) {
-            if (pName === "Commodity C") baseProductVolume = 0.30;
-            else baseProductVolume = 0.02;
+            baseProductionPerHour = (pName === "Commodity C") ? 18 : 1.2;
         } else {
-            baseProductVolume = 0.05;
+            baseProductionPerHour = 3;
         }
 
-        baseProductVolume *= weatherModifiers.productionMultiplier;
-        var baseBuyVolume = (data.specializationText.includes("Trade Hub") && pName === "Commodity C") ? 0.32 : 0.16;
+        var productionPerHour = baseProductionPerHour * weatherModifiers.productionMultiplier;
+        var demandPerHour = (data.specializationText.includes("Trade Hub") && pName === "Commodity C") ? 19.2 : 9.6;
 
-        item.stock += baseProductVolume;
-        item.stock -= baseBuyVolume;
-        if (item.stock < 0) item.stock = 0;
+        // Дефицит считаем НАПРЯМУЮ по объёмам, а не косвенно через изменение цены:
+        // сколько реально было доступно к продаже (склад + производство этого часа),
+        // столько максимум и можно продать.
+        var availableForSale = item.stock + productionPerHour;
+        var fulfilledDemand = Math.min(demandPerHour, availableForSale);
+        var unmetDemand = Math.max(0, demandPerHour - fulfilledDemand);
 
-        var demand = Math.round(baseBuyVolume * 60);
-        var currentProdPerHour = Math.round(baseProductVolume * 60);
-        var supply = currentProdPerHour + Math.round(item.stock);
+        // Складские остатки гарантированно неотрицательны: продать можно не больше,
+        // чем реально было в наличии, поэтому вычитание никогда не уйдёт ниже нуля.
+        item.stock = availableForSale - fulfilledDemand;
 
-        var currentPrice;
-        if (ACTIVE_PRICE_MODEL === "market") {
-            var ratio = supply === 0 ? 3.5 : demand / supply;
-            ratio = Math.max(0.3, Math.min(ratio, 3.5));
-            currentPrice = item.base_price * ratio;
-        } else if (ACTIVE_PRICE_MODEL === "linear") {
-            currentPrice = item.base_price + (demand - currentProdPerHour) * 1.5 - item.stock * 0.2;
-            currentPrice = Math.max(item.base_price * 0.4, Math.min(currentPrice, 120));
-        } else if (ACTIVE_PRICE_MODEL === "inertia") {
-            currentPrice = item.last_price + (demand - currentProdPerHour) * 0.8 - item.stock * 0.1;
-            currentPrice = Math.max(item.base_price * 0.4, Math.min(currentPrice, 120));
-        } else {
-            throw new Error("Unknown ACTIVE_PRICE_MODEL: " + ACTIVE_PRICE_MODEL);
-        }
+        var currentPrice = computeCurrentPrice(item, demandPerHour, productionPerHour, availableForSale, item.stock);
         currentPrice *= weatherModifiers.priceMultiplier;
-        if (ACTIVE_PRICE_MODEL === "inertia") item.last_price = currentPrice;
+        if (ExperimentConfig.model === "inertia") item.last_price = currentPrice;
         item.current_price = currentPrice;
 
         cityHourLogs.push({
-            model: ACTIVE_PRICE_MODEL,
-            seed: EXPERIMENT_SEED,
+            run_id: ExperimentConfig.run_id,
+            model: ExperimentConfig.model,
+            scenario: ExperimentConfig.scenario,
+            seed: ExperimentConfig.seed,
             day: gameDay,
             hour: gameHour,
             city: id,
             product: pName,
             stock: item.stock,
-            production: currentProdPerHour,
-            demand: demand,
-            supply: supply,
+            production_per_hour: productionPerHour,
+            demand_per_hour: demandPerHour,
+            fulfilled_demand: fulfilledDemand,
+            unmet_demand: unmetDemand,
             current_price: currentPrice,
-            weather_event: EventSystem.getEventName()
+            weather_event: data.localWeatherObject ? data.localWeatherObject.name : EventSystem.getEventName()
         });
 
         goodsText += "\n[ ТОВАР: " + pName + " ]" +
-            "\n * Производство : " + currentProdPerHour + " ед./ч" +
-            "\n * Спрос (Закупки): " + demand + " ед./ч" +
-            "\n * Предложение  : " + supply + " ед. (На складе: " + Math.round(item.stock) + ")" +
-            "\n * Цена (" + ACTIVE_PRICE_MODEL + ") : " + currentPrice.toFixed(1) + " руб.\n";
+            "\n * Производство : " + productionPerHour.toFixed(2) + " ед./ч" +
+            "\n * Спрос        : " + demandPerHour.toFixed(2) + " ед./ч" +
+            "\n * Продано      : " + fulfilledDemand.toFixed(2) + " ед./ч (дефицит: " + unmetDemand.toFixed(2) + ")" +
+            "\n * На складе    : " + Math.round(item.stock) + " ед." +
+            "\n * Цена (" + ExperimentConfig.model + ") : " + currentPrice.toFixed(1) + " руб.\n";
     }
 
     var tooltipText = "ГОРОД: " + id.toUpperCase() + "\nПрофиль: " + data.specializationText +
         "\n-------------------------------------" +
         "\n⏱ Время: День " + gameDay + ", " + exactTimeString +
         "\n👥 Население: " + data.population.toLocaleString() + " чел." +
-        "\n⚡ Погодное событие: " + data.currentEvent +
+        "\n⚡ Погодное событие: " + (data.localWeatherLabel || "Нет данных") +
         "\n-------------------------------------" + goodsText;
 
     nodes.update({id: id, title: tooltipText});
