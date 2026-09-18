@@ -1,0 +1,15 @@
+# Local Python environments and newly generated caches.
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Local operating-system files.
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Existing tracked HTML, JSON, CSV, libraries and caches are kept intact.
